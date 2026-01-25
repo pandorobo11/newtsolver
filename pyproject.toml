@@ -1,0 +1,23 @@
+[project]
+name = "fmfsolver"
+version = "0.1.0"
+description = "Sentman free-molecular-flow STL panel solver with PySide6 + PyVistaQt GUI"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy",
+  "pandas",
+  "openpyxl",
+  "trimesh",
+  "pyvista",
+  "pyvistaqt",
+  "pyside6==6.9.3",
+  "rtree",
+]
+
+[project.scripts]
+fmfsolver = "fmfsolver.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

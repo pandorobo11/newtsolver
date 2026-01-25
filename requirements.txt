@@ -1,0 +1,8 @@
+numpy
+pandas
+openpyxl
+trimesh
+pyvista
+pyvistaqt
+pyside6
+rtree
