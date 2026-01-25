@@ -3,16 +3,6 @@ from __future__ import annotations
 import math
 import numpy as np
 
-RU = 8.314462618
-AIR_MOLAR_MASS_KG_PER_MOL = 28.964e-3
-
-def R_from_mol_weight_g_per_mol(M_g_per_mol: float) -> float:
-    molar_mass = float(M_g_per_mol) * 1e-3
-    return RU / molar_mass
-
-def R_air_default() -> float:
-    return RU / AIR_MOLAR_MASS_KG_PER_MOL
-
 def vhat_from_alpha_beta_stl(alpha_deg: float, beta_deg: float) -> np.ndarray:
     """Freestream unit vector in STL axes.
 

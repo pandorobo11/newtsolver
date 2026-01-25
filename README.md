@@ -11,9 +11,14 @@ uv run fmfsolver
 ```
 
 ## Notes
-- Place `US1976.xlsx` in the working directory where you run the program (fixed filename).
 - Input is an Excel file (header row + cases rows).
 - Output summary is written as `<input_stem>_result.xlsx` in the same folder as the input.
+
+## Data source
+US1976 atmospheric tables (Table 1 and Table 2) are sourced from PDAS Big Tables:
+```
+https://www.pdas.com/bigtables.html
+```
 
 
 ### Optional/Required

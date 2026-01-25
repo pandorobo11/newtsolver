@@ -14,8 +14,6 @@ from .sentman_core import (
     sentman_dC_dA_vector,
     stl_to_body,
     rot_y,
-    R_air_default,
-    R_from_mol_weight_g_per_mol,
 )
 
 def _is_filled(x) -> bool:
@@ -34,19 +32,18 @@ def _mode_from_row(row: dict) -> str:
         raise ValueError(f"Case '{row.get('case_id')}' has NEITHER complete Mode A nor Mode B inputs.")
     return "A" if A_ok else "B"
 
-def _compute_S_Ti_R(row: dict) -> tuple[float, float, float, str]:
+def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
     mode = _mode_from_row(row)
 
     if mode == "A":
         S = float(row["S"])
         Ti = float(row["Ti_K"])
-        R = R_air_default()
-        return S, Ti, R, "A"
+        return S, Ti, "A"
 
     Mach = float(row["Mach"])
     alt = float(row["Altitude_km"])
 
-    atm = sample_at_altitude_km(alt, path_str="US1976.xlsx")
+    atm = sample_at_altitude_km(alt)
     Ti = float(atm["T_K"])
     c = float(atm["c_ms"])
     v_mean = float(atm["Vmean_ms"])
@@ -54,8 +51,7 @@ def _compute_S_Ti_R(row: dict) -> tuple[float, float, float, str]:
 
     V_bulk = Mach * c
     S = V_bulk / v_mp
-    R = R_from_mol_weight_g_per_mol(float(atm["M_g_per_mol"]))
-    return S, Ti, R, "B"
+    return S, Ti, "B"
 
 def run_case(row: dict, logfn) -> dict:
     case_id = str(row["case_id"])
@@ -79,7 +75,7 @@ def run_case(row: dict, logfn) -> dict:
     out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    S, Ti, R, mode = _compute_S_Ti_R(row)
+    S, Ti, mode = _compute_S_Ti_R(row)
 
     Vhat = vhat_from_alpha_beta_stl(alpha_deg, beta_deg)
 

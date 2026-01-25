@@ -2,71 +2,97 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+import importlib.resources as resources
 import numpy as np
 import pandas as pd
 
-_US1976_CACHE: pd.DataFrame | None = None
+_US1976_TABLE1: pd.DataFrame | None = None
+_US1976_TABLE2: pd.DataFrame | None = None
 
-def _find_header_row(path: Path, max_scan_rows: int = 50) -> int:
-    preview = pd.read_excel(path, header=None, nrows=max_scan_rows, engine="openpyxl")
-    needed = {"Z", "T", "ρ", "c", "V", "M"}
 
-    def norm(x) -> str:
-        if x is None:
-            return ""
-        if isinstance(x, float) and math.isnan(x):
-            return ""
-        return str(x).strip().replace(" ", "")
+def _data_path(filename: str):
+    try:
+        return resources.files("fmfsolver").joinpath("data", filename)
+    except Exception:
+        return Path(__file__).resolve().parent / "data" / filename
 
-    for r in range(len(preview)):
-        row = {norm(v) for v in preview.iloc[r].tolist()}
-        if needed.issubset(row):
-            return r
-    raise ValueError("Failed to locate header row in US1976.xlsx (need Z,T,ρ,c,V,M).")
 
-def load_us1976_fixed(path_str: str = "US1976.xlsx") -> pd.DataFrame:
-    global _US1976_CACHE
-    if _US1976_CACHE is not None:
-        return _US1976_CACHE
-
-    path = Path(path_str)
-    if not path.exists():
-        raise FileNotFoundError(f"US1976 file not found: {path.resolve()}")
-
-    header_row = _find_header_row(path)
-    df = pd.read_excel(path, header=header_row, engine="openpyxl")
-    df.columns = [str(c).strip().replace(" ", "") for c in df.columns]
-
-    for col in ["Z", "T", "ρ", "c", "V", "M"]:
+def _load_table1(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    for col in ["Z", "T", "c"]:
         if col not in df.columns:
-            raise ValueError(f"US1976.xlsx missing required column '{col}'.")
-
-    out = df[["Z", "T", "ρ", "c", "V", "M"]].copy()
+            raise ValueError(f"us1976_table1.csv missing required column '{col}'.")
+    out = df[["Z", "T", "c"]].copy()
     for c in out.columns:
         out[c] = pd.to_numeric(out[c], errors="coerce")
-
-    out = out.dropna(subset=["Z", "T", "ρ", "c", "V", "M"]).sort_values("Z").reset_index(drop=True)
-    _US1976_CACHE = out
+    out = out.dropna(subset=["Z", "T", "c"]).sort_values("Z").reset_index(drop=True)
     return out
 
-def sample_at_altitude_km(alt_km: float, path_str: str = "US1976.xlsx") -> dict:
-    df = load_us1976_fixed(path_str)
-    Z = df["Z"].to_numpy(dtype=float)
 
-    if alt_km < Z.min() or alt_km > Z.max():
-        raise ValueError(f"Altitude_km={alt_km} out of range [{Z.min()}, {Z.max()}]")
+def _load_table2(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    for col in ["Z", "V"]:
+        if col not in df.columns:
+            raise ValueError(f"us1976_table2.csv missing required column '{col}'.")
+    out = df[["Z", "V"]].copy()
+    for c in out.columns:
+        out[c] = pd.to_numeric(out[c], errors="coerce")
+    out = out.dropna(subset=["Z", "V"]).sort_values("Z").reset_index(drop=True)
+    return out
 
-    def interp(col: str) -> float:
-        y = df[col].to_numpy(dtype=float)
-        return float(np.interp(alt_km, Z, y))
+
+def load_us1976_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Load US1976 tables from bundled CSVs (PDAS Table 1 and Table 2)."""
+    global _US1976_TABLE1, _US1976_TABLE2
+    if _US1976_TABLE1 is None:
+        path1 = _data_path("us1976_table1.csv")
+        if isinstance(path1, Path):
+            if not path1.exists():
+                raise FileNotFoundError(f"us1976_table1.csv not found: {path1}")
+            _US1976_TABLE1 = _load_table1(path1)
+        else:
+            with resources.as_file(path1) as p:
+                if not p.exists():
+                    raise FileNotFoundError(f"us1976_table1.csv not found: {p}")
+                _US1976_TABLE1 = _load_table1(p)
+    if _US1976_TABLE2 is None:
+        path2 = _data_path("us1976_table2.csv")
+        if isinstance(path2, Path):
+            if not path2.exists():
+                raise FileNotFoundError(f"us1976_table2.csv not found: {path2}")
+            _US1976_TABLE2 = _load_table2(path2)
+        else:
+            with resources.as_file(path2) as p:
+                if not p.exists():
+                    raise FileNotFoundError(f"us1976_table2.csv not found: {p}")
+                _US1976_TABLE2 = _load_table2(p)
+    return _US1976_TABLE1, _US1976_TABLE2
+
+
+def sample_at_altitude_km(alt_km: float) -> dict:
+    t1, t2 = load_us1976_tables()
+    Z1 = t1["Z"].to_numpy(dtype=float)
+    Z2 = t2["Z"].to_numpy(dtype=float)
+
+    zmin = max(float(Z1.min()), float(Z2.min()))
+    zmax = min(float(Z1.max()), float(Z2.max()))
+    if alt_km < zmin or alt_km > zmax:
+        raise ValueError(f"Altitude_km={alt_km} out of range [{zmin}, {zmax}]")
+
+    def interp_t1(col: str) -> float:
+        y = t1[col].to_numpy(dtype=float)
+        return float(np.interp(alt_km, Z1, y))
+
+    def interp_t2(col: str) -> float:
+        y = t2[col].to_numpy(dtype=float)
+        return float(np.interp(alt_km, Z2, y))
 
     return {
-        "T_K": interp("T"),
-        "rho_kgm3": interp("ρ"),
-        "c_ms": interp("c"),
-        "Vmean_ms": interp("V"),
-        "M_g_per_mol": interp("M"),
+        "T_K": interp_t1("T"),
+        "c_ms": interp_t1("c"),
+        "Vmean_ms": interp_t2("V"),
     }
+
 
 def mean_to_most_probable_speed(v_mean: float) -> float:
     return (math.sqrt(math.pi) / 2.0) * float(v_mean)
