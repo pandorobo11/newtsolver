@@ -7,8 +7,8 @@ import pandas as pd
 
 from .mesh_utils import load_meshes
 from .shadowing import compute_shadow_mask
-from .exporters import export_vtp, export_npz
-from .us1976 import sample_at_altitude_km, mean_to_most_probable_speed
+from ..io.exporters import export_vtp, export_npz
+from ..physics.us1976 import sample_at_altitude_km, mean_to_most_probable_speed
 from .sentman_core import (
     vhat_from_alpha_beta_stl,
     sentman_dC_dA_vector,

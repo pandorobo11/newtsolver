@@ -9,9 +9,9 @@ from PySide6 import QtWidgets, QtCore
 import pyvista as pv
 from pyvistaqt import QtInteractor
 
-from .io_excel import read_cases
-from .solver import run_cases
-from .excel_out import write_results_excel
+from ..io.io_excel import read_cases
+from ..core.solver import run_cases
+from ..io.excel_out import write_results_excel
 
 
 def _format_case_text(row: dict) -> str:
