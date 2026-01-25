@@ -420,7 +420,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.plotter.render()
 
 
-def main():
+def launch():
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
     w.show()

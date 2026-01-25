@@ -1,4 +1,4 @@
-from .app.gui_app import main as gui_main
+from .app.gui_app import launch as launch_gui
 
 def main():
-    gui_main()
+    launch_gui()
