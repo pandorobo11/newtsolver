@@ -110,15 +110,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.cmb_scalar = QtWidgets.QComboBox()
         self.cmb_scalar.addItems([
-            "Cp_n", "shadowed", "theta_deg", "area_m2",
+            "Cp_n", "shielded", "theta_deg", "area_m2",
             "center_x_stl_m", "center_y_stl_m", "center_z_stl_m",
         ])
 
         self.chk_edges = QtWidgets.QCheckBox("Show edges")
         self.chk_edges.setChecked(True)
 
-        self.chk_shadow_transparent = QtWidgets.QCheckBox("Shadowed transparent")
-        self.chk_shadow_transparent.setChecked(True)
+        self.chk_shield_transparent = QtWidgets.QCheckBox("Shielded transparent")
+        self.chk_shield_transparent.setChecked(True)
 
         self.cmb_cmap = QtWidgets.QComboBox()
         self.cmb_cmap.addItems(["jet", "viridis", "bwr"])
@@ -136,7 +136,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ctrl.addWidget(QtWidgets.QLabel("Scalar:"), r, 0)
         ctrl.addWidget(self.cmb_scalar, r, 1)
         ctrl.addWidget(self.chk_edges, r, 2)
-        ctrl.addWidget(self.chk_shadow_transparent, r, 3)
+        ctrl.addWidget(self.chk_shield_transparent, r, 3)
         ctrl.addWidget(QtWidgets.QLabel("Colormap:"), r, 4)
         ctrl.addWidget(self.cmb_cmap, r, 5)
         ctrl.addWidget(self.btn_open_vtp, r, 6)
@@ -169,7 +169,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_open_vtp.clicked.connect(self.open_vtp)
         self.cmb_scalar.currentTextChanged.connect(self.update_view)
         self.chk_edges.toggled.connect(self.update_view)
-        self.chk_shadow_transparent.toggled.connect(self.update_view)
+        self.chk_shield_transparent.toggled.connect(self.update_view)
         self.cmb_cmap.currentTextChanged.connect(self.update_view)
         self.edit_vmin.editingFinished.connect(self.update_view)
         self.edit_vmax.editingFinished.connect(self.update_view)
@@ -320,7 +320,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_view()
 
     def _get_clim(self, poly: pv.PolyData, scalar: str):
-        if scalar == "shadowed":
+        if scalar == "shielded":
             return (0.0, 1.0)
         if scalar not in poly.cell_data:
             return None
@@ -372,20 +372,20 @@ class MainWindow(QtWidgets.QMainWindow):
         scalar = self.cmb_scalar.currentText()
         cmap = self.cmb_cmap.currentText()
         show_edges = self.chk_edges.isChecked()
-        shadow_transparent = self.chk_shadow_transparent.isChecked()
+        shield_transparent = self.chk_shield_transparent.isChecked()
 
         self.plotter.clear()
         poly = self._poly
 
-        sh = np.asarray(poly.cell_data["shadowed"]).astype(int) if "shadowed" in poly.cell_data else None
+        sh = np.asarray(poly.cell_data["shielded"]).astype(int) if "shielded" in poly.cell_data else None
         clim = self._get_clim(poly, scalar)
 
         if sh is not None:
             exposed_ids = np.where(sh == 0)[0]
-            shadowed_ids = np.where(sh == 1)[0]
+            shielded_ids = np.where(sh == 1)[0]
 
             exposed = poly.extract_cells(exposed_ids) if len(exposed_ids) else None
-            shadowed = poly.extract_cells(shadowed_ids) if len(shadowed_ids) else None
+            shielded = poly.extract_cells(shielded_ids) if len(shielded_ids) else None
 
             if exposed is not None and exposed.n_cells > 0:
                 self.plotter.add_mesh(
@@ -396,11 +396,11 @@ class MainWindow(QtWidgets.QMainWindow):
                     show_edges=show_edges,
                     opacity=1.0,
                 )
-            if shadowed is not None and shadowed.n_cells > 0:
-                opacity = 0.30 if shadow_transparent else 1.0
+            if shielded is not None and shielded.n_cells > 0:
+                opacity = 0.30 if shield_transparent else 1.0
                 self.plotter.add_mesh(
-                    shadowed,
-                    scalars=scalar if scalar in shadowed.cell_data else None,
+                    shielded,
+                    scalars=scalar if scalar in shielded.cell_data else None,
                     cmap=cmap,
                     clim=clim,
                     show_edges=show_edges,

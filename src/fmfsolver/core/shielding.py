@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import trimesh
 
-def compute_shadow_mask(mesh: trimesh.Trimesh, centers_m: np.ndarray, Vhat: np.ndarray) -> np.ndarray:
-    """Compute shadowed faces by casting rays from each face center along -V direction.
+def compute_shield_mask(mesh: trimesh.Trimesh, centers_m: np.ndarray, Vhat: np.ndarray) -> np.ndarray:
+    """Compute shielded faces by casting rays from each face center along -V direction.
 
     `rtree` is REQUIRED (declared as dependency) for trimesh ray acceleration.
     """
@@ -28,8 +28,8 @@ def compute_shadow_mask(mesh: trimesh.Trimesh, centers_m: np.ndarray, Vhat: np.n
         return_locations=True,
     )
 
-    shadowed = np.zeros(len(centers_m), dtype=bool)
+    shielded = np.zeros(len(centers_m), dtype=bool)
     for t, r in zip(tri_idx, ray_idx):
         if int(t) != int(r):
-            shadowed[int(r)] = True
-    return shadowed
+            shielded[int(r)] = True
+    return shielded

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from .mesh_utils import load_meshes
-from .shadowing import compute_shadow_mask
+from .shielding import compute_shield_mask
 from ..io.exporters import export_vtp, export_npz
 from ..physics.us1976 import sample_at_altitude_km, mean_to_most_probable_speed
 from .sentman_core import (
@@ -86,9 +86,9 @@ def run_case(row: dict, logfn) -> dict:
     areas = md.areas_m2
 
     if shielding_on:
-        shadowed = compute_shadow_mask(mesh, centers_stl, Vhat)
+        shielded = compute_shield_mask(mesh, centers_stl, Vhat)
     else:
-        shadowed = np.zeros(len(areas), dtype=bool)
+        shielded = np.zeros(len(areas), dtype=bool)
 
     C_face_stl = np.zeros((len(areas), 3), dtype=float)
     Cp_n = np.zeros(len(areas), dtype=float)
@@ -103,7 +103,7 @@ def run_case(row: dict, logfn) -> dict:
         dot_nv = max(-1.0, min(1.0, dot_nv))
         theta_deg[i] = math.degrees(math.acos(dot_nv))
 
-        if shadowed[i]:
+        if shielded[i]:
             continue
 
         dC_dA, eta, gam = sentman_dC_dA_vector(
@@ -131,7 +131,7 @@ def run_case(row: dict, logfn) -> dict:
 
     C_M_body = np.zeros(3, dtype=float)
     for i in range(len(areas)):
-        if shadowed[i]:
+        if shielded[i]:
             continue
         center_body = stl_to_body(centers_stl[i])
         r = center_body - ref_body
@@ -154,7 +154,7 @@ def run_case(row: dict, logfn) -> dict:
     if save_vtp:
         cell_data = {
             "area_m2": areas,
-            "shadowed": shadowed.astype(np.uint8),
+            "shielded": shielded.astype(np.uint8),
             "Cp_n": Cp_n,
             "theta_deg": theta_deg,
             "eta": eta_arr,
@@ -181,7 +181,7 @@ def run_case(row: dict, logfn) -> dict:
             centers_stl_m=centers_stl,
             normals_out_stl=normals_out_stl,
             areas_m2=areas,
-            shadowed=shadowed,
+            shielded=shielded,
             Vhat_stl=Vhat,
             S=S,
             Ti_K=Ti,
@@ -209,7 +209,7 @@ def run_case(row: dict, logfn) -> dict:
         "CD": CD,
         "CL": CL,
         "faces": int(len(mesh.faces)),
-        "shadowed_faces": int(shadowed.sum()),
+        "shielded_faces": int(shielded.sum()),
         "vtp_path": str(vtp_path) if save_vtp else "",
         "npz_path": str(npz_path) if save_npz else "",
     }
