@@ -172,9 +172,6 @@ def run_case(row: dict, logfn) -> dict:
         dot_nv = max(-1.0, min(1.0, dot_nv))
         theta_deg[i] = math.degrees(math.acos(dot_nv))
 
-        if shielded[i]:
-            continue
-
         dC_dA, eta, gam = sentman_dC_dA_vector(
             Vhat=Vhat,
             n_out=normals_out_stl[i],
@@ -182,6 +179,7 @@ def run_case(row: dict, logfn) -> dict:
             Ti=Ti,
             Tw=Tw,
             Aref=Aref,
+            shielded=shielded[i],
         )
         eta_arr[i] = eta
         gamma_arr[i] = gam
@@ -200,8 +198,6 @@ def run_case(row: dict, logfn) -> dict:
 
     C_M_body = np.zeros(3, dtype=float)
     for i in range(len(areas)):
-        if shielded[i]:
-            continue
         center_body = stl_to_body(centers_stl[i])
         r = center_body - ref_body
         C_face_body = stl_to_body(C_face_stl[i])

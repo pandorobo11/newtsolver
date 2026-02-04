@@ -32,8 +32,13 @@ def sentman_dC_dA_vector(
     Ti: float,
     Tw: float,
     Aref: float,
+    shielded: bool = False,
 ) -> tuple[np.ndarray, float, float]:
-    # Baseline "working" implementation kept unchanged to avoid breaking existing results.
+    """Compute Sentman dC/dA vector and angular factors.
+
+    If shielded=True, include only the reflected term (C); otherwise include A+B+C.
+    Returns (dC_dA, eta, gamma).
+    """
     Vhat = np.asarray(Vhat, dtype=float)
     n_out = np.asarray(n_out, dtype=float)
     n_in = -n_out
@@ -57,16 +62,21 @@ def sentman_dC_dA_vector(
         * ((eta * math.sqrt(math.pi) / S) * Phi + (1.0 / (S * S)) * E)
     )
 
-    dC_dA = (A * Vhat + (B + C) * n_in) / float(Aref)
+    if shielded:
+        dC_dA = (C * n_in) / float(Aref)
+    else:
+        dC_dA = (A * Vhat + (B + C) * n_in) / float(Aref)
     return dC_dA, eta, gamma
 
 
 def stl_to_body(v_stl: np.ndarray) -> np.ndarray:
+    """Convert a vector from STL axes to body axes."""
     v = np.asarray(v_stl, dtype=float)
     return np.array([-v[0], v[1], -v[2]], dtype=float)
 
 
 def rot_y(alpha_rad: float) -> np.ndarray:
+    """Rotation matrix about +Y axis by alpha_rad (right-handed)."""
     c = math.cos(alpha_rad)
     s = math.sin(alpha_rad)
     return np.array(
