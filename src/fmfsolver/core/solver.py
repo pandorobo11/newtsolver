@@ -1,22 +1,24 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
+from ..io.exporters import export_npz, export_vtp
+from ..physics.us1976 import mean_to_most_probable_speed, sample_at_altitude_km
 from .mesh_utils import load_meshes
-from .shielding import compute_shield_mask
-from ..io.exporters import export_vtp, export_npz
-from ..physics.us1976 import sample_at_altitude_km, mean_to_most_probable_speed
 from .sentman_core import (
-    vhat_from_alpha_beta_stl,
+    rot_y,
     sentman_dC_dA_vector,
     stl_to_body,
-    rot_y,
+    vhat_from_alpha_beta_stl,
 )
-import hashlib
-import json
+from .shielding import compute_shield_mask
+
 
 def _is_filled(x) -> bool:
     if x is None:
@@ -25,14 +27,18 @@ def _is_filled(x) -> bool:
         return False
     return str(x).strip() != ""
 
+
 def _mode_from_row(row: dict) -> str:
     A_ok = _is_filled(row.get("S")) and _is_filled(row.get("Ti_K"))
     B_ok = _is_filled(row.get("Mach")) and _is_filled(row.get("Altitude_km"))
     if A_ok and B_ok:
         raise ValueError(f"Case '{row.get('case_id')}' has BOTH Mode A and Mode B inputs.")
     if (not A_ok) and (not B_ok):
-        raise ValueError(f"Case '{row.get('case_id')}' has NEITHER complete Mode A nor Mode B inputs.")
+        raise ValueError(
+            f"Case '{row.get('case_id')}' has NEITHER complete Mode A nor Mode B inputs."
+        )
     return "A" if A_ok else "B"
+
 
 def build_case_signature(row: dict) -> str:
     keys = [
@@ -90,6 +96,7 @@ def build_case_signature(row: dict) -> str:
     payload = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+
 def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
     mode = _mode_from_row(row)
 
@@ -111,6 +118,7 @@ def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
     S = V_bulk / v_mp
     return S, Ti, "B"
 
+
 def run_case(row: dict, logfn) -> dict:
     case_id = str(row["case_id"])
     stl_paths = [p.strip() for p in str(row["stl_path"]).split(";") if p.strip()]
@@ -122,7 +130,9 @@ def run_case(row: dict, logfn) -> dict:
     Lref_Cn = float(row["Lref_Cn_m"])
 
     Tw = float(row["Tw_K"])
-    ref_body = np.array([float(row["ref_x_m"]), float(row["ref_y_m"]), float(row["ref_z_m"])], dtype=float)
+    ref_body = np.array(
+        [float(row["ref_x_m"]), float(row["ref_y_m"]), float(row["ref_z_m"])], dtype=float
+    )
 
     alpha_deg = float(row["alpha_deg"])
     beta_deg = float(row["beta_deg"])
@@ -185,7 +195,7 @@ def run_case(row: dict, logfn) -> dict:
     C_force_body = stl_to_body(C_force_stl)
 
     CA = -float(C_force_body[0])
-    CY =  float(C_force_body[1])
+    CY = float(C_force_body[1])
     CN = -float(C_force_body[2])
 
     C_M_body = np.zeros(3, dtype=float)
@@ -249,7 +259,14 @@ def run_case(row: dict, logfn) -> dict:
             C_force_stl=C_force_stl,
             C_force_body=C_force_body,
             C_M_body=C_M_body,
-            CA=CA, CY=CY, CN=CN, Cl=Cl, Cm=Cm, Cn=Cn, CD=CD, CL=CL,
+            CA=CA,
+            CY=CY,
+            CN=CN,
+            Cl=Cl,
+            Cm=Cm,
+            Cn=Cn,
+            CD=CD,
+            CL=CL,
             Cp_n=Cp_n,
         )
 
@@ -272,6 +289,7 @@ def run_case(row: dict, logfn) -> dict:
         "vtp_path": str(vtp_path) if save_vtp else "",
         "npz_path": str(npz_path) if save_npz else "",
     }
+
 
 def run_cases(df: pd.DataFrame, logfn) -> pd.DataFrame:
     rows = []

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import numpy as np
 import pyvista as pv
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtCore, QtWidgets
 from pyvistaqt import QtInteractor
 
 from .ui_utils import format_case_text
@@ -33,10 +34,17 @@ class ViewerPanel(QtWidgets.QWidget):
         ctrl.setContentsMargins(0, 0, 0, 0)
 
         self.cmb_scalar = QtWidgets.QComboBox()
-        self.cmb_scalar.addItems([
-            "Cp_n", "shielded", "theta_deg", "area_m2",
-            "center_x_stl_m", "center_y_stl_m", "center_z_stl_m",
-        ])
+        self.cmb_scalar.addItems(
+            [
+                "Cp_n",
+                "shielded",
+                "theta_deg",
+                "area_m2",
+                "center_x_stl_m",
+                "center_y_stl_m",
+                "center_z_stl_m",
+            ]
+        )
 
         self.chk_edges = QtWidgets.QCheckBox("Show edges")
         self.chk_edges.setChecked(True)
@@ -69,7 +77,9 @@ class ViewerPanel(QtWidgets.QWidget):
         self.lbl_colorbar = QtWidgets.QLabel("Colorbar range:")
         self.lbl_camera = QtWidgets.QLabel("Camera:")
         for lbl in (self.lbl_scalar, self.lbl_colorbar, self.lbl_camera):
-            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            lbl.setAlignment(
+                QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+            )
 
         max_label_width = max(
             self.lbl_scalar.sizeHint().width(),
@@ -313,7 +323,11 @@ class ViewerPanel(QtWidgets.QWidget):
         self.plotter.clear()
         poly = self._poly
 
-        sh = np.asarray(poly.cell_data["shielded"]).astype(int) if "shielded" in poly.cell_data else None
+        sh = (
+            np.asarray(poly.cell_data["shielded"]).astype(int)
+            if "shielded" in poly.cell_data
+            else None
+        )
         clim = self._get_clim(poly, scalar)
 
         if sh is not None:

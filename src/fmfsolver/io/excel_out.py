@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from pathlib import Path
+
 import pandas as pd
+
 
 def write_results_excel(out_path: str, df_in: pd.DataFrame, df_out: pd.DataFrame):
     out = Path(out_path)

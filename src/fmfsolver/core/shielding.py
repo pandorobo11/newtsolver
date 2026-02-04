@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 import trimesh
 
-def compute_shield_mask(mesh: trimesh.Trimesh, centers_m: np.ndarray, Vhat: np.ndarray) -> np.ndarray:
+
+def compute_shield_mask(
+    mesh: trimesh.Trimesh, centers_m: np.ndarray, Vhat: np.ndarray
+) -> np.ndarray:
     """Compute shielded faces by casting rays from each face center along -V direction.
 
     `rtree` is REQUIRED (declared as dependency) for trimesh ray acceleration.

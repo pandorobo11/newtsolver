@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import math
+
 import numpy as np
+
 
 def vhat_from_alpha_beta_stl(alpha_deg: float, beta_deg: float) -> np.ndarray:
     """Freestream unit vector in STL axes.
@@ -21,6 +23,8 @@ def vhat_from_alpha_beta_stl(alpha_deg: float, beta_deg: float) -> np.ndarray:
     if n == 0:
         raise ValueError("Invalid alpha/beta leading to zero direction.")
     return v / n
+
+
 def sentman_dC_dA_vector(
     Vhat: np.ndarray,
     n_out: np.ndarray,
@@ -47,22 +51,29 @@ def sentman_dC_dA_vector(
 
     A = gamma * Phi + (1.0 / (S * math.sqrt(math.pi))) * E
     B = (1.0 / (2.0 * S * S)) * Phi
-    C = 0.5 * math.sqrt(float(Tw) / float(Ti)) * (
-        (eta * math.sqrt(math.pi) / S) * Phi + (1.0 / (S * S)) * E
+    C = (
+        0.5
+        * math.sqrt(float(Tw) / float(Ti))
+        * ((eta * math.sqrt(math.pi) / S) * Phi + (1.0 / (S * S)) * E)
     )
 
     dC_dA = (A * Vhat + (B + C) * n_in) / float(Aref)
     return dC_dA, eta, gamma
 
+
 def stl_to_body(v_stl: np.ndarray) -> np.ndarray:
     v = np.asarray(v_stl, dtype=float)
     return np.array([-v[0], v[1], -v[2]], dtype=float)
 
+
 def rot_y(alpha_rad: float) -> np.ndarray:
     c = math.cos(alpha_rad)
     s = math.sin(alpha_rad)
-    return np.array([
-        [ c, 0.0,  s],
-        [0.0, 1.0, 0.0],
-        [-s, 0.0,  c],
-    ], dtype=float)
+    return np.array(
+        [
+            [c, 0.0, s],
+            [0.0, 1.0, 0.0],
+            [-s, 0.0, c],
+        ],
+        dtype=float,
+    )

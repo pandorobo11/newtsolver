@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
+
 import numpy as np
 import trimesh
+
 
 @dataclass
 class MeshData:
@@ -12,6 +14,7 @@ class MeshData:
     centers_m: np.ndarray
     normals_out: np.ndarray
     areas_m2: np.ndarray
+
 
 def load_meshes(stl_paths: List[str], scale_m_per_unit: float, logfn) -> MeshData:
     meshes = []

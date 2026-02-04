@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from pathlib import Path
+
 import pandas as pd
 
 REQUIRED = [
@@ -24,6 +26,7 @@ DEFAULTS = {
     "save_npz_on": 0,
     "out_dir": "outputs",
 }
+
 
 def read_cases(xlsx_path: str) -> pd.DataFrame:
     p = Path(xlsx_path).expanduser()

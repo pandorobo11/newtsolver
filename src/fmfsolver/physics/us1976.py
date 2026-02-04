@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import importlib.resources as resources
 import math
 from pathlib import Path
-import importlib.resources as resources
+
 import numpy as np
 import pandas as pd
 

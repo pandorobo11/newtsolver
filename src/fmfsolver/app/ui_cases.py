@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import pandas as pd
 import pyvista as pv
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtCore, QtWidgets
 
-from ..io.io_excel import read_cases
-from ..core.solver import run_cases, build_case_signature
+from ..core.solver import build_case_signature, run_cases
 from ..io.excel_out import write_results_excel
+from ..io.io_excel import read_cases
 
 
 class CasesPanel(QtWidgets.QWidget):
@@ -24,8 +25,12 @@ class CasesPanel(QtWidgets.QWidget):
         self.btn_run.setEnabled(False)
 
         self.case_table = QtWidgets.QTableWidget()
-        self.case_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.case_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.case_table.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
+        )
+        self.case_table.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.case_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.case_table.setAlternatingRowColors(True)
         self.case_table.horizontalHeader().setStretchLastSection(True)
@@ -81,9 +86,9 @@ class CasesPanel(QtWidgets.QWidget):
             return
 
         def _mode_from_row(r: dict) -> str:
-            if (pd.notna(r.get("S")) and pd.notna(r.get("Ti_K"))):
+            if pd.notna(r.get("S")) and pd.notna(r.get("Ti_K")):
                 return "A"
-            if (pd.notna(r.get("Mach")) and pd.notna(r.get("Altitude_km"))):
+            if pd.notna(r.get("Mach")) and pd.notna(r.get("Altitude_km")):
                 return "B"
             return "?"
 

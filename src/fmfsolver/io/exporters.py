@@ -1,9 +1,18 @@
 from __future__ import annotations
+
 from pathlib import Path
+
 import numpy as np
 import pyvista as pv
 
-def export_vtp(out_path: str, vertices: np.ndarray, faces: np.ndarray, cell_data: dict, field_data: dict | None = None):
+
+def export_vtp(
+    out_path: str,
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    cell_data: dict,
+    field_data: dict | None = None,
+):
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -21,6 +30,7 @@ def export_vtp(out_path: str, vertices: np.ndarray, faces: np.ndarray, cell_data
             poly.field_data[k] = np.asarray([v])
 
     poly.save(str(out), binary=True)
+
 
 def export_npz(out_path: str, **arrays):
     out = Path(out_path)

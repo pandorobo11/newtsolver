@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6 import QtWidgets, QtCore
+from PySide6 import QtCore, QtWidgets
 
 from .ui_cases import CasesPanel
 from .viewer import ViewerPanel
