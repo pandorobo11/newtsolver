@@ -15,6 +15,8 @@ from .sentman_core import (
     stl_to_body,
     rot_y,
 )
+import hashlib
+import json
 
 def _is_filled(x) -> bool:
     if x is None:
@@ -31,6 +33,62 @@ def _mode_from_row(row: dict) -> str:
     if (not A_ok) and (not B_ok):
         raise ValueError(f"Case '{row.get('case_id')}' has NEITHER complete Mode A nor Mode B inputs.")
     return "A" if A_ok else "B"
+
+def build_case_signature(row: dict) -> str:
+    keys = [
+        "case_id",
+        "stl_path",
+        "stl_scale_m_per_unit",
+        "alpha_deg",
+        "beta_deg",
+        "Tw_K",
+        "ref_x_m",
+        "ref_y_m",
+        "ref_z_m",
+        "Aref_m2",
+        "Lref_Cl_m",
+        "Lref_Cm_m",
+        "Lref_Cn_m",
+        "S",
+        "Ti_K",
+        "Mach",
+        "Altitude_km",
+        "shielding_on",
+    ]
+    numeric_keys = {
+        "stl_scale_m_per_unit",
+        "alpha_deg",
+        "beta_deg",
+        "Tw_K",
+        "ref_x_m",
+        "ref_y_m",
+        "ref_z_m",
+        "Aref_m2",
+        "Lref_Cl_m",
+        "Lref_Cm_m",
+        "Lref_Cn_m",
+        "S",
+        "Ti_K",
+        "Mach",
+        "Altitude_km",
+        "shielding_on",
+    }
+
+    def norm_value(k, v):
+        if v is None:
+            return None
+        if isinstance(v, float) and math.isnan(v):
+            return None
+        if k in numeric_keys:
+            try:
+                return float(v)
+            except Exception:
+                return str(v)
+        return str(v)
+
+    data = {k: norm_value(k, row.get(k)) for k in keys}
+    payload = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
     mode = _mode_from_row(row)
@@ -76,6 +134,7 @@ def run_case(row: dict, logfn) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     S, Ti, mode = _compute_S_Ti_R(row)
+    signature = build_case_signature(row)
 
     Vhat = vhat_from_alpha_beta_stl(alpha_deg, beta_deg)
 
@@ -170,7 +229,7 @@ def run_case(row: dict, logfn) -> dict:
             mesh.vertices,
             mesh.faces,
             cell_data,
-            field_data={"case_id": case_id},
+            field_data={"case_id": case_id, "case_signature": signature},
         )
 
     if save_npz:

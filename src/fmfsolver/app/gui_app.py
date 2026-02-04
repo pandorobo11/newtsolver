@@ -10,7 +10,7 @@ import pyvista as pv
 from pyvistaqt import QtInteractor
 
 from ..io.io_excel import read_cases
-from ..core.solver import run_cases
+from ..core.solver import run_cases, build_case_signature
 from ..io.excel_out import write_results_excel
 
 
@@ -75,11 +75,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_run = QtWidgets.QPushButton("Run Selected Cases")
         self.btn_run.setEnabled(False)
 
-        self.case_list = QtWidgets.QListWidget()
-        self.case_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.case_table = QtWidgets.QTableWidget()
+        self.case_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.case_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.case_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.case_table.setAlternatingRowColors(True)
+        self.case_table.horizontalHeader().setStretchLastSection(True)
 
-        self.selected_case_label = QtWidgets.QLabel("Selected case: (none)")
-        self.selected_case_label.setWordWrap(True)
 
         self.log = QtWidgets.QPlainTextEdit()
         self.log.setReadOnly(True)
@@ -88,9 +90,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout.addWidget(self.xlsx_label)
         left_layout.addWidget(self.btn_pick_xlsx)
         left_layout.addWidget(QtWidgets.QLabel("Cases:"))
-        left_layout.addWidget(self.case_list, 3)
-        left_layout.addWidget(QtWidgets.QLabel("Selected case info (list selection):"))
-        left_layout.addWidget(self.selected_case_label, 0)
+        left_layout.addWidget(self.case_table, 3)
         left_layout.addWidget(self.btn_run)
         left_layout.addWidget(QtWidgets.QLabel("Log:"))
         left_layout.addWidget(self.log, 2)
@@ -275,7 +275,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_view_iso_1.clicked.connect(self.set_view_iso_1)
         self.btn_view_iso_2.clicked.connect(self.set_view_iso_2)
         self.btn_save_image.clicked.connect(self.save_view_image)
-        self.case_list.currentItemChanged.connect(self.on_case_changed)
+        self.case_table.itemSelectionChanged.connect(self.on_case_selection_changed)
 
     # -------------------------
     # Utility
@@ -339,31 +339,71 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_run.setEnabled(False)
             return
 
-        self.case_list.clear()
-        for i, row in self.df_cases.iterrows():
-            cid = str(row["case_id"])
-            a = row.get("alpha_deg")
-            b = row.get("beta_deg")
-            mode = "A" if (pd.notna(row.get("S")) and pd.notna(row.get("Ti_K"))) else (
-                "B" if (pd.notna(row.get("Mach")) and pd.notna(row.get("Altitude_km"))) else "?"
-            )
-            it = QtWidgets.QListWidgetItem(
-                f"{cid} | mode={mode} | alpha={a} beta={b} | {row['stl_path']}"
-            )
-            it.setData(QtCore.Qt.ItemDataRole.UserRole, int(i))
-            self.case_list.addItem(it)
+        def _mode_from_row(r: dict) -> str:
+            if (pd.notna(r.get("S")) and pd.notna(r.get("Ti_K"))):
+                return "A"
+            if (pd.notna(r.get("Mach")) and pd.notna(r.get("Altitude_km"))):
+                return "B"
+            return "?"
+
+        cols = ["case_id", "mode"] + [c for c in self.df_cases.columns if c != "case_id"]
+        self.case_table.clear()
+        self.case_table.setColumnCount(len(cols))
+        self.case_table.setRowCount(len(self.df_cases))
+        self.case_table.setHorizontalHeaderLabels(cols)
+
+        for row_idx, (_, row) in enumerate(self.df_cases.iterrows()):
+            row_dict = row.to_dict()
+            row_dict["mode"] = _mode_from_row(row_dict)
+            for col_idx, col in enumerate(cols):
+                val = row_dict.get(col, "")
+                if pd.isna(val):
+                    text = ""
+                else:
+                    text = str(val)
+                item = QtWidgets.QTableWidgetItem(text)
+                if col_idx == 0:
+                    item.setData(QtCore.Qt.ItemDataRole.UserRole, int(row_idx))
+                self.case_table.setItem(row_idx, col_idx, item)
+
+        self.case_table.resizeColumnsToContents()
 
         self.btn_run.setEnabled(True)
         self.logln(f"[OK] Loaded {len(self.df_cases)} case(s). Select and run.")
-        self.selected_case_label.setText("Selected case: (none)")
 
-    def on_case_changed(self, current, _prev):
-        if current is None or self.df_cases is None:
-            self.selected_case_label.setText("Selected case: (none)")
+    def on_case_selection_changed(self):
+        if self.df_cases is None:
             return
-        idx = current.data(QtCore.Qt.ItemDataRole.UserRole)
+        sel = self.case_table.selectionModel().selectedRows()
+        if not sel:
+            return
+        row_idx = sel[0].row()
+        item = self.case_table.item(row_idx, 0)
+        if item is None:
+            return
+        idx = item.data(QtCore.Qt.ItemDataRole.UserRole)
         row = self.df_cases.loc[int(idx)].to_dict()
-        self.selected_case_label.setText(_format_case_text(row))
+        case_id = str(row.get("case_id", "")).strip()
+        out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
+        if case_id:
+            vtp_path = out_dir / f"{case_id}.vtp"
+            if vtp_path.exists():
+                try:
+                    poly = pv.read(str(vtp_path))
+                except Exception as e:
+                    self.logln(f"[ERROR] Failed to read VTP: {e}")
+                    return
+
+                expected = build_case_signature(row)
+                actual = None
+                try:
+                    if "case_signature" in poly.field_data:
+                        actual = str(poly.field_data["case_signature"][0])
+                except Exception:
+                    actual = None
+
+                if actual == expected:
+                    self.load_vtp(str(vtp_path), poly=poly)
 
     # -------------------------
     # Run
@@ -384,9 +424,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.df_cases is None or self.xlsx_path is None:
             return
 
-        sel = self.case_list.selectedItems()
+        sel = self.case_table.selectionModel().selectedRows()
         if sel:
-            idxs = [it.data(QtCore.Qt.ItemDataRole.UserRole) for it in sel]
+            idxs = []
+            for s in sel:
+                item = self.case_table.item(s.row(), 0)
+                if item is not None:
+                    idxs.append(item.data(QtCore.Qt.ItemDataRole.UserRole))
             df_sel = self.df_cases.loc[idxs].reset_index(drop=True)
         else:
             df_sel = self.df_cases.copy().reset_index(drop=True)
@@ -426,13 +470,16 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.load_vtp(path)
 
-    def load_vtp(self, path: str):
-        try:
-            self._poly = pv.read(path)
-        except Exception as e:
-            self.logln(f"[ERROR] Failed to read VTP: {e}")
-            self._poly = None
-            return
+    def load_vtp(self, path: str, poly: pv.PolyData | None = None):
+        if poly is None:
+            try:
+                self._poly = pv.read(path)
+            except Exception as e:
+                self.logln(f"[ERROR] Failed to read VTP: {e}")
+                self._poly = None
+                return
+        else:
+            self._poly = poly
 
         # Determine which case this VTP corresponds to (for overlay)
         self._display_case_row = None
