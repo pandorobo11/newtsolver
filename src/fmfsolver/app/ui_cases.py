@@ -7,8 +7,8 @@ import pyvista as pv
 from PySide6 import QtCore, QtWidgets
 
 from ..core.solver import build_case_signature, run_cases
-from ..io.excel_out import write_results_excel
-from ..io.io_excel import read_cases
+from ..io.csv_out import write_results_csv
+from ..io.io_cases import read_cases
 
 
 class CasesPanel(QtWidgets.QWidget):
@@ -19,8 +19,8 @@ class CasesPanel(QtWidgets.QWidget):
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
 
-        self.xlsx_label = QtWidgets.QLabel("Excel: (not selected)")
-        self.btn_pick_xlsx = QtWidgets.QPushButton("Select Excel Input")
+        self.xlsx_label = QtWidgets.QLabel("Input: (not selected)")
+        self.btn_pick_xlsx = QtWidgets.QPushButton("Select Input File")
         self.btn_run = QtWidgets.QPushButton("Run Selected Cases")
         self.btn_run.setEnabled(False)
 
@@ -59,7 +59,10 @@ class CasesPanel(QtWidgets.QWidget):
 
     def pick_xlsx(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Select Excel Input", str(Path.cwd()), "Excel (*.xlsx *.xlsm)"
+            self,
+            "Select Input File",
+            str(Path.cwd()),
+            "CSV/Excel (*.csv *.xlsx *.xlsm *.xls)",
         )
         if not path:
             return
@@ -147,18 +150,6 @@ class CasesPanel(QtWidgets.QWidget):
         if actual == expected:
             self.vtp_loaded.emit(str(vtp_path), poly)
 
-    def _confirm_overwrite(self, out_path: Path) -> bool:
-        if not out_path.exists():
-            return True
-        resp = QtWidgets.QMessageBox.question(
-            self,
-            "Overwrite?",
-            f"Result file already exists:\n{out_path}\n\nOverwrite it?",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-            QtWidgets.QMessageBox.StandardButton.No,
-        )
-        return resp == QtWidgets.QMessageBox.StandardButton.Yes
-
     def run_selected(self):
         if self.df_cases is None or self.xlsx_path is None:
             return
@@ -174,21 +165,30 @@ class CasesPanel(QtWidgets.QWidget):
         else:
             df_sel = self.df_cases.copy().reset_index(drop=True)
 
+        out_summary = Path(self.xlsx_path)
+        out_dir = Path("outputs")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        default_path = out_dir / f"{out_summary.stem}_result.csv"
+
+        out_path_str, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Save Results",
+            str(default_path),
+            "CSV (*.csv)",
+        )
+        if not out_path_str:
+            self.logln("[SKIP] Result output canceled.")
+            return
+
+        out_path = Path(out_path_str)
+
         self.logln(f"[RUN] Running {len(df_sel)} case(s)...")
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
         try:
             res = run_cases(df_sel, self.logln)
 
-            out_summary = Path(self.xlsx_path)
-            out_dir = Path("outputs")
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{out_summary.stem}_result.xlsx"
-
-            if self._confirm_overwrite(out_path):
-                write_results_excel(str(out_path), df_sel, res)
-                self.logln(f"[OK] Wrote results: {out_path}")
-            else:
-                self.logln(f"[SKIP] Not overwriting existing file: {out_path}")
+            write_results_csv(str(out_path), df_sel, res)
+            self.logln(f"[OK] Wrote results: {out_path}")
 
             if len(res) and str(res.loc[0, "vtp_path"]).strip():
                 vtp_path = str(res.loc[0, "vtp_path"])

@@ -1,0 +1,4 @@
+case_id,stl_path,stl_scale_m_per_unit,alpha_deg,beta_deg,Tw_K,ref_x_m,ref_y_m,ref_z_m,Aref_m2,Lref_Cl_m,Lref_Cm_m,Lref_Cn_m,S,Ti_K,Mach,Altitude_km,shielding_on,save_vtp_on,save_npz_on,out_dir
+case_A,samples/stl/cube.stl,1,0,0,300,0,0,0,1,1,1,1,5.0,300.0,,,0,1,0,outputs
+case_B,samples/stl/plate.stl,1,5,0,300,0,0,0,1,1,1,1,,,25.0,100.0,0,1,0,outputs
+case_C_shield,samples/stl/double_plate.stl,1,0,0,300,0,0,0,1,1,1,1,5.0,300.0,,,1,1,0,outputs

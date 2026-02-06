@@ -28,9 +28,15 @@ DEFAULTS = {
 }
 
 
-def read_cases(xlsx_path: str) -> pd.DataFrame:
-    p = Path(xlsx_path).expanduser()
-    df = pd.read_excel(p, engine="openpyxl")
+def read_cases(path: str) -> pd.DataFrame:
+    p = Path(path).expanduser()
+    suffix = p.suffix.lower()
+    if suffix == ".csv":
+        df = pd.read_csv(p)
+    elif suffix in {".xlsx", ".xlsm", ".xls"}:
+        df = pd.read_excel(p, engine="openpyxl")
+    else:
+        raise ValueError(f"Unsupported input format: {p.suffix}")
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns: {missing}")

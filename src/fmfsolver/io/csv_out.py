@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 
-def write_results_excel(out_path: str, df_in: pd.DataFrame, df_out: pd.DataFrame):
+def write_results_csv(out_path: str, df_in: pd.DataFrame, df_out: pd.DataFrame):
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -16,5 +16,4 @@ def write_results_excel(out_path: str, df_in: pd.DataFrame, df_out: pd.DataFrame
 
     combined = pd.concat([df_in.reset_index(drop=True), df_out2.reset_index(drop=True)], axis=1)
 
-    with pd.ExcelWriter(out, engine="openpyxl") as w:
-        combined.to_excel(w, index=False, sheet_name="summary")
+    combined.to_csv(out, index=False)

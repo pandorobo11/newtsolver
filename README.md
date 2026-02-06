@@ -16,8 +16,8 @@ uv run fmfsolver
 ```
 
 ## Notes
-- Input is an Excel file (header row + cases rows).
-- Output summary is written as `outputs/<input_stem>_result.xlsx`.
+- Input is a CSV or Excel file (header row + cases rows).
+- Output summary is written as `outputs/<input_stem>_result.csv`.
 
 ## Data source
 US1976 atmospheric tables (Table 1 and Table 2) are sourced from PDAS Big Tables:
