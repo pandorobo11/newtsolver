@@ -46,14 +46,13 @@ def sentman_dC_dA_vector(
     n_out = np.asarray(n_out, dtype=float)
     n_in = -n_out
 
-    eta = float(np.dot(Vhat, n_in))
-    gamma = math.sqrt(max(0.0, 1.0 - eta * eta))
+    gamma = float(np.dot(Vhat, n_in))
 
     S = float(S)
     if S <= 0:
         raise ValueError(f"S must be > 0, got {S}")
 
-    hs = eta * S
+    hs = gamma * S
     Phi = 1.0 + math.erf(hs)
     E = math.exp(-(hs * hs))
 
@@ -62,7 +61,7 @@ def sentman_dC_dA_vector(
     C = (
         0.5
         * math.sqrt(float(Tw) / float(Ti))
-        * ((eta * math.sqrt(math.pi) / S) * Phi + (1.0 / (S * S)) * E)
+        * ((gamma * math.sqrt(math.pi) / S) * Phi + (1.0 / (S * S)) * E)
     )
 
     dC_dA = (A * Vhat + (B + C) * n_in) / float(Aref)
