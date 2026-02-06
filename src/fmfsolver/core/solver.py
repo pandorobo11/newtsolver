@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
@@ -280,11 +281,37 @@ def run_case(row: dict, logfn) -> dict:
         "npz_path": str(npz_path) if save_npz else "",
     }
 
+def _null_log(_msg: str):
+    return None
 
-def run_cases(df: pd.DataFrame, logfn) -> pd.DataFrame:
-    rows = []
+def _run_case_worker(row: dict) -> dict:
+    return run_case(row, _null_log)
+
+
+def run_cases(df: pd.DataFrame, logfn, workers: int = 1) -> pd.DataFrame:
+    df = df.reset_index(drop=True)
     total = len(df)
-    for i, (_, r) in enumerate(df.iterrows(), start=1):
-        logfn(f"[RUN] ({i}/{total}) case_id={r['case_id']}")
-        rows.append(run_case(r.to_dict(), logfn))
+    if workers <= 1 or total <= 1:
+        rows = []
+        for i, (_, r) in enumerate(df.iterrows(), start=1):
+            logfn(f"[RUN] ({i}/{total}) case_id={r['case_id']}")
+            rows.append(run_case(r.to_dict(), logfn))
+        return pd.DataFrame(rows)
+
+    logfn(f"[RUN] Parallel execution with {workers} worker(s)")
+    rows = [None] * total
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        futures = {}
+        for i, (_, r) in enumerate(df.iterrows()):
+            futures[ex.submit(_run_case_worker, r.to_dict())] = i
+
+        for fut in as_completed(futures):
+            i = futures[fut]
+            try:
+                rows[i] = fut.result()
+                logfn(f"[OK] ({i+1}/{total}) case_id={df.loc[i, 'case_id']}")
+            except Exception as e:
+                logfn(f"[ERROR] ({i+1}/{total}) case_id={df.loc[i, 'case_id']}: {e}")
+                raise
+
     return pd.DataFrame(rows)

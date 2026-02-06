@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 import pandas as pd
 import pyvista as pv
@@ -24,6 +25,12 @@ class CasesPanel(QtWidgets.QWidget):
         self.btn_run = QtWidgets.QPushButton("Run Selected Cases")
         self.btn_run.setEnabled(False)
 
+        self.lbl_workers = QtWidgets.QLabel("Workers:")
+        self.spin_workers = QtWidgets.QSpinBox()
+        max_workers = os.cpu_count() or 1
+        self.spin_workers.setRange(1, max_workers)
+        self.spin_workers.setValue(1)
+
         self.case_table = QtWidgets.QTableWidget()
         self.case_table.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
@@ -43,6 +50,11 @@ class CasesPanel(QtWidgets.QWidget):
         layout.addWidget(self.btn_pick_xlsx)
         layout.addWidget(QtWidgets.QLabel("Cases:"))
         layout.addWidget(self.case_table, 3)
+        workers_layout = QtWidgets.QHBoxLayout()
+        workers_layout.addWidget(self.lbl_workers)
+        workers_layout.addWidget(self.spin_workers)
+        workers_layout.addStretch(1)
+        layout.addLayout(workers_layout)
         layout.addWidget(self.btn_run)
         layout.addWidget(QtWidgets.QLabel("Log:"))
         layout.addWidget(self.log, 2)
@@ -182,10 +194,11 @@ class CasesPanel(QtWidgets.QWidget):
 
         out_path = Path(out_path_str)
 
+        workers = int(self.spin_workers.value())
         self.logln(f"[RUN] Running {len(df_sel)} case(s)...")
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
         try:
-            res = run_cases(df_sel, self.logln)
+            res = run_cases(df_sel, self.logln, workers=workers)
 
             write_results_csv(str(out_path), df_sel, res)
             self.logln(f"[OK] Wrote results: {out_path}")
