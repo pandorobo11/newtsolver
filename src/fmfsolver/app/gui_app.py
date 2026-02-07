@@ -7,7 +7,7 @@ from PySide6 import QtWidgets
 from .main_window import MainWindow
 
 
-def launch():
+def main():
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
     w.show()

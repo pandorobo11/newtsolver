@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [project.scripts]
-fmfsolver = "fmfsolver.main:main"
+fmfsolver = "fmfsolver.app.gui_app:main"
+fmfsolver-gui = "fmfsolver.app.gui_app:main"
 fmfsolver-cli = "fmfsolver.app.cli_app:main"
 
 [build-system]

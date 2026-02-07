@@ -14,6 +14,7 @@ python -m pip install .
 ```bash
 uv run fmfsolver
 ```
+(`uv run fmfsolver-gui` is also available.)
 
 ## Run (CLI)
 ```bash
