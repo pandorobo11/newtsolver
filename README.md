@@ -30,6 +30,7 @@ uv run fmfsolver
 2. Select cases in the table (or leave unselected to run all).
 3. Set `Workers` if needed.
 4. Click `Run Selected Cases` and choose result CSV path.
+5. Use the progress bar to monitor run status. Click `Cancel` to request cooperative stop.
 
 ### CLI
 ```bash
@@ -42,7 +43,7 @@ uv run fmfsolver-cli \
   --input samples/input_template.csv \
   --workers 4 \
   --output outputs/result.csv \
-  --cases case_A case_C_shield
+  --cases baseline_cube_modeA baseline_double_plate_shield_on
 ```
 
 ## Input File Specification (Common)
@@ -153,7 +154,7 @@ Examples:
 uv run fmfsolver-cli --input samples/input_template.csv
 
 # Run selected cases with 4 workers
-uv run fmfsolver-cli --input samples/input_template.csv -j 4 --cases case_A case_C_shield
+uv run fmfsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cube_modeA baseline_double_plate_shield_on
 
 # Specify output path
 uv run fmfsolver-cli --input samples/input_template.csv -o outputs/custom_result.csv

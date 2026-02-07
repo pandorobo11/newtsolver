@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import os
+import threading
+from pathlib import Path
 
 import pandas as pd
 import pyvista as pv
@@ -12,6 +13,53 @@ from PySide6 import QtCore, QtWidgets
 from ..core.solver import build_case_signature, run_cases
 from ..io.csv_out import write_results_csv
 from ..io.io_cases import read_cases
+
+
+class _CaseRunWorker(QtCore.QObject):
+    """Background worker running selected cases without blocking the GUI."""
+
+    log = QtCore.Signal(str)
+    progress = QtCore.Signal(int, int)
+    completed = QtCore.Signal(object)
+    failed = QtCore.Signal(str)
+    canceled = QtCore.Signal()
+
+    def __init__(self, df_selected: pd.DataFrame, workers: int):
+        super().__init__()
+        self._df_selected = df_selected
+        self._workers = workers
+        self._cancel_event = threading.Event()
+
+    @QtCore.Slot()
+    def run(self):
+        """Run the solver pipeline and emit completion/progress signals."""
+        try:
+            result = run_cases(
+                self._df_selected,
+                self.log.emit,
+                workers=self._workers,
+                progress_cb=self._emit_progress,
+                cancel_cb=self._cancel_event.is_set,
+            )
+        except Exception as e:
+            if str(e) == "Canceled by user.":
+                self.canceled.emit()
+            else:
+                self.failed.emit(str(e))
+            return
+
+        if self._cancel_event.is_set():
+            self.canceled.emit()
+            return
+
+        self.completed.emit(result)
+
+    def cancel(self):
+        """Request cooperative cancellation."""
+        self._cancel_event.set()
+
+    def _emit_progress(self, done: int, total: int):
+        self.progress.emit(done, total)
 
 
 class CasesPanel(QtWidgets.QWidget):
@@ -27,6 +75,8 @@ class CasesPanel(QtWidgets.QWidget):
         self.input_label = QtWidgets.QLabel("Input: (not selected)")
         self.btn_pick_input = QtWidgets.QPushButton("Select Input File")
         self.btn_run = QtWidgets.QPushButton("Run Selected Cases")
+        self.btn_cancel = QtWidgets.QPushButton("Cancel")
+        self.btn_cancel.setEnabled(False)
         self.btn_run.setEnabled(False)
 
         self.lbl_workers = QtWidgets.QLabel("Workers:")
@@ -59,15 +109,28 @@ class CasesPanel(QtWidgets.QWidget):
         workers_layout.addWidget(self.spin_workers)
         workers_layout.addStretch(1)
         layout.addLayout(workers_layout)
-        layout.addWidget(self.btn_run)
+        run_layout = QtWidgets.QHBoxLayout()
+        run_layout.addWidget(self.btn_run)
+        run_layout.addWidget(self.btn_cancel)
+        layout.addLayout(run_layout)
+        self.progress = QtWidgets.QProgressBar()
+        self.progress.setRange(0, 1)
+        self.progress.setValue(0)
+        self.progress.setFormat("Idle")
+        layout.addWidget(self.progress)
         layout.addWidget(QtWidgets.QLabel("Log:"))
         layout.addWidget(self.log, 2)
 
         self.df_cases: pd.DataFrame | None = None
         self.input_path: str | None = None
+        self._run_thread: QtCore.QThread | None = None
+        self._run_worker: _CaseRunWorker | None = None
+        self._run_df_selected: pd.DataFrame | None = None
+        self._run_out_path: Path | None = None
 
         self.btn_pick_input.clicked.connect(self.pick_input_file)
         self.btn_run.clicked.connect(self.run_selected)
+        self.btn_cancel.clicked.connect(self.cancel_run)
         self.case_table.itemSelectionChanged.connect(self.on_case_selection_changed)
 
     def logln(self, s: str):
@@ -174,6 +237,8 @@ class CasesPanel(QtWidgets.QWidget):
         """Run selected rows (or all rows) and write result CSV to chosen path."""
         if self.df_cases is None or self.input_path is None:
             return
+        if self._run_thread is not None:
+            return
 
         sel = self.case_table.selectionModel().selectedRows()
         if sel:
@@ -204,13 +269,57 @@ class CasesPanel(QtWidgets.QWidget):
         out_path = Path(out_path_str)
 
         workers = int(self.spin_workers.value())
-        self.logln(f"[RUN] Running {len(df_sel)} case(s)...")
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
-        try:
-            res = run_cases(df_sel, self.logln, workers=workers)
+        self._run_df_selected = df_sel.copy().reset_index(drop=True)
+        self._run_out_path = out_path
+        self.progress.setRange(0, len(self._run_df_selected))
+        self.progress.setValue(0)
+        self.progress.setFormat(f"0/{len(self._run_df_selected)}")
+        self._set_running_state(True)
+        self.logln(f"[RUN] Running {len(self._run_df_selected)} case(s)...")
 
-            write_results_csv(str(out_path), df_sel, res)
-            self.logln(f"[OK] Wrote results: {out_path}")
+        self._run_thread = QtCore.QThread(self)
+        self._run_worker = _CaseRunWorker(self._run_df_selected, workers)
+        self._run_worker.moveToThread(self._run_thread)
+
+        self._run_thread.started.connect(self._run_worker.run)
+        self._run_worker.log.connect(self.logln)
+        self._run_worker.progress.connect(self._on_run_progress)
+        self._run_worker.completed.connect(self._on_run_completed)
+        self._run_worker.failed.connect(self._on_run_failed)
+        self._run_worker.canceled.connect(self._on_run_canceled)
+
+        self._run_worker.completed.connect(self._run_thread.quit)
+        self._run_worker.failed.connect(self._run_thread.quit)
+        self._run_worker.canceled.connect(self._run_thread.quit)
+        self._run_thread.finished.connect(self._cleanup_run_worker)
+
+        self._run_thread.start()
+
+    def cancel_run(self):
+        """Request cancellation of an ongoing run."""
+        if self._run_worker is None:
+            return
+        self._run_worker.cancel()
+        self.btn_cancel.setEnabled(False)
+        self.logln("[CANCEL] Cancellation requested...")
+
+    def _on_run_progress(self, done: int, total: int):
+        self.progress.setRange(0, max(total, 1))
+        self.progress.setValue(done)
+        self.progress.setFormat(f"{done}/{total}")
+
+    def _on_run_completed(self, res):
+        if self._run_df_selected is None or self._run_out_path is None:
+            self.logln("[ERROR] Missing run context when finishing.")
+            self._set_running_state(False)
+            return
+        try:
+            write_results_csv(str(self._run_out_path), self._run_df_selected, res)
+            self.logln(f"[OK] Wrote results: {self._run_out_path}")
+            total = len(self._run_df_selected)
+            self.progress.setRange(0, max(total, 1))
+            self.progress.setValue(total)
+            self.progress.setFormat(f"{total}/{total}")
 
             if len(res) and str(res.loc[0, "vtp_path"]).strip():
                 vtp_path = str(res.loc[0, "vtp_path"])
@@ -218,9 +327,37 @@ class CasesPanel(QtWidgets.QWidget):
                     poly = pv.read(vtp_path)
                 except Exception as e:
                     self.logln(f"[ERROR] Failed to read VTP: {e}")
+                    self._set_running_state(False)
                     return
                 self.vtp_loaded.emit(vtp_path, poly)
         except Exception as e:
             self.logln(f"[ERROR] {e}")
         finally:
-            QtWidgets.QApplication.restoreOverrideCursor()
+            self._set_running_state(False)
+
+    def _on_run_failed(self, message: str):
+        self.logln(f"[ERROR] {message}")
+        self.progress.setFormat("Failed")
+        self._set_running_state(False)
+
+    def _on_run_canceled(self):
+        self.logln("[CANCEL] Run canceled.")
+        self.progress.setFormat("Canceled")
+        self._set_running_state(False)
+
+    def _set_running_state(self, running: bool):
+        self.btn_pick_input.setEnabled(not running)
+        self.spin_workers.setEnabled(not running)
+        self.case_table.setEnabled(not running)
+        self.btn_cancel.setEnabled(running)
+        self.btn_run.setEnabled((not running) and (self.df_cases is not None))
+
+    def _cleanup_run_worker(self):
+        if self._run_worker is not None:
+            self._run_worker.deleteLater()
+            self._run_worker = None
+        if self._run_thread is not None:
+            self._run_thread.deleteLater()
+            self._run_thread = None
+        self._run_df_selected = None
+        self._run_out_path = None

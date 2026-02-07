@@ -6,10 +6,11 @@ import hashlib
 import json
 import math
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -342,40 +343,84 @@ def _run_case_worker(row: dict) -> dict:
     return run_case(row, _null_log)
 
 
-def run_cases(df: pd.DataFrame, logfn, workers: int = 1) -> pd.DataFrame:
+def run_cases(
+    df: pd.DataFrame,
+    logfn,
+    workers: int = 1,
+    progress_cb: Callable[[int, int], None] | None = None,
+    cancel_cb: Callable[[], bool] | None = None,
+) -> pd.DataFrame:
     """Run multiple cases sequentially or in parallel.
 
     Args:
         df: Input cases dataframe.
         logfn: Logging callback accepting one string argument.
         workers: Process count for case-level parallel execution.
+        progress_cb: Optional callback receiving ``(done, total)``.
+        cancel_cb: Optional callback returning ``True`` to request cancellation.
 
     Returns:
         Dataframe of per-case summary results, preserving input row order.
     """
     df = df.reset_index(drop=True)
     total = len(df)
+    if cancel_cb is not None and cancel_cb():
+        raise RuntimeError("Canceled by user.")
+
     if workers <= 1 or total <= 1:
         rows = []
         for i, (_, r) in enumerate(df.iterrows(), start=1):
+            if cancel_cb is not None and cancel_cb():
+                raise RuntimeError("Canceled by user.")
             logfn(f"[RUN] ({i}/{total}) case_id={r['case_id']}")
             rows.append(run_case(r.to_dict(), logfn))
+            if progress_cb is not None:
+                progress_cb(i, total)
         return pd.DataFrame(rows)
 
     logfn(f"[RUN] Parallel execution with {workers} worker(s)")
     rows = [None] * total
-    with ProcessPoolExecutor(max_workers=workers) as ex:
+    done_count = 0
+    canceled = False
+    ex = ProcessPoolExecutor(max_workers=workers)
+    try:
         futures = {}
         for i, (_, r) in enumerate(df.iterrows()):
+            if cancel_cb is not None and cancel_cb():
+                canceled = True
+                break
             futures[ex.submit(_run_case_worker, r.to_dict())] = i
 
-        for fut in as_completed(futures):
-            i = futures[fut]
-            try:
-                rows[i] = fut.result()
-                logfn(f"[OK] ({i+1}/{total}) case_id={df.loc[i, 'case_id']}")
-            except Exception as e:
-                logfn(f"[ERROR] ({i+1}/{total}) case_id={df.loc[i, 'case_id']}: {e}")
-                raise
+        while futures and not canceled:
+            done, _pending = wait(
+                list(futures.keys()),
+                timeout=0.1,
+                return_when=FIRST_COMPLETED,
+            )
+            if not done:
+                if cancel_cb is not None and cancel_cb():
+                    canceled = True
+                continue
+
+            for fut in done:
+                i = futures.pop(fut)
+                try:
+                    rows[i] = fut.result()
+                    done_count += 1
+                    logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[i, 'case_id']}")
+                    if progress_cb is not None:
+                        progress_cb(done_count, total)
+                except Exception as e:
+                    logfn(f"[ERROR] ({i+1}/{total}) case_id={df.loc[i, 'case_id']}: {e}")
+                    raise
+
+                if cancel_cb is not None and cancel_cb():
+                    canceled = True
+                    break
+    finally:
+        ex.shutdown(wait=not canceled, cancel_futures=canceled)
+
+    if canceled:
+        raise RuntimeError("Canceled by user.")
 
     return pd.DataFrame(rows)

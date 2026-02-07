@@ -5,7 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from fmfsolver.core.solver import build_case_signature, run_case
+import pandas as pd
+
+from fmfsolver.core.solver import build_case_signature, run_case, run_cases
 
 
 class TestSolverPipeline(unittest.TestCase):
@@ -113,6 +115,71 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertGreaterEqual(float(result["run_elapsed_s"]), 0.0)
             for key in ("S", "Ti_K", "CA", "CY", "CN", "CD", "CL"):
                 self.assertTrue(math.isfinite(float(result[key])), key)
+
+    def test_run_cases_cancel_before_start(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "case_id": "cancel_case",
+                    "stl_path": "samples/stl/cube.stl",
+                    "stl_scale_m_per_unit": 1.0,
+                    "alpha_deg": 0.0,
+                    "beta_deg": 0.0,
+                    "Tw_K": 300.0,
+                    "ref_x_m": 0.0,
+                    "ref_y_m": 0.0,
+                    "ref_z_m": 0.0,
+                    "Aref_m2": 1.0,
+                    "Lref_Cl_m": 1.0,
+                    "Lref_Cm_m": 1.0,
+                    "Lref_Cn_m": 1.0,
+                    "S": 5.0,
+                    "Ti_K": 300.0,
+                    "shielding_on": 0,
+                    "save_vtp_on": 0,
+                    "save_npz_on": 0,
+                    "out_dir": ".",
+                }
+            ]
+        )
+        with self.assertRaisesRegex(RuntimeError, "Canceled by user."):
+            run_cases(df, lambda _msg: None, workers=1, cancel_cb=lambda: True)
+
+    def test_run_cases_progress_callback(self):
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+            df = pd.DataFrame(
+                [
+                    {
+                        "case_id": "progress_case",
+                        "stl_path": "samples/stl/cube.stl",
+                        "stl_scale_m_per_unit": 1.0,
+                        "alpha_deg": 0.0,
+                        "beta_deg": 0.0,
+                        "Tw_K": 300.0,
+                        "ref_x_m": 0.0,
+                        "ref_y_m": 0.0,
+                        "ref_z_m": 0.0,
+                        "Aref_m2": 1.0,
+                        "Lref_Cl_m": 1.0,
+                        "Lref_Cm_m": 1.0,
+                        "Lref_Cn_m": 1.0,
+                        "S": 5.0,
+                        "Ti_K": 300.0,
+                        "shielding_on": 0,
+                        "save_vtp_on": 0,
+                        "save_npz_on": 0,
+                        "out_dir": td,
+                    }
+                ]
+            )
+            ticks: list[tuple[int, int]] = []
+            _ = run_cases(
+                df,
+                lambda _msg: None,
+                workers=1,
+                progress_cb=lambda done, total: ticks.append((done, total)),
+            )
+            self.assertEqual(ticks, [(1, 1)])
 
 
 if __name__ == "__main__":
