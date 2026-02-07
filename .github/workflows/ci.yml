@@ -21,3 +21,19 @@ jobs:
 
       - name: Unit tests
         run: uv run python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Verify tag matches version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          EXPECTED="$(python - <<'PY'
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              data = tomllib.load(f)
+          print(f"v{data['project']['version']}")
+          PY
+          )"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "Tag/version mismatch: tag=$TAG expected=$EXPECTED"
+            exit 1
+          fi

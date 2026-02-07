@@ -6,11 +6,6 @@ Sentman free-molecular-flow (FMF) panel solver for STL geometry.
 - CLI: batch execution from CSV/Excel input file.
 - Output: result CSV, per-case VTP, optional NPZ.
 
-## Versioning Rule
-
-- Current project version is managed in `pyproject.toml` (`[project].version`).
-- For this repository, update the version value on every commit.
-
 ## Install
 
 ### uv
@@ -197,6 +192,16 @@ uv run fmfsolver-cli --input samples/input_template.csv -o outputs/custom_result
 US1976 atmospheric tables (Table 1 and Table 2) are sourced from PDAS Big Tables:
 
 https://www.pdas.com/bigtables.html
+
+## Development
+
+### Versioning Rule
+
+- Project version is managed in `pyproject.toml` (`[project].version`).
+- Versioning follows SemVer (`MAJOR.MINOR.PATCH`).
+- Update the version only for release commits (not every commit).
+- Use tag format `vX.Y.Z` and keep tag/version consistent.
+- See `RELEASE.md` for the full release workflow.
 
 ## Dependency Note
 
