@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Unit tests
+        run: uv run python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Flat plate verification
+        run: uv run fmfsolver-verify-flat-plate --tol 1e-10
