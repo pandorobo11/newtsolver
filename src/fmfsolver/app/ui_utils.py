@@ -1,7 +1,10 @@
+"""Small UI-specific formatting helpers."""
+
 from __future__ import annotations
 
 
 def format_case_text(row: dict) -> str:
+    """Build a compact one-line summary of a case row for display."""
     parts: list[str] = []
 
     def add(k, v):

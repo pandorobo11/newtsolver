@@ -1,3 +1,5 @@
+"""Cases panel for input loading, execution, and logging."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,6 +15,8 @@ from ..io.io_cases import read_cases
 
 
 class CasesPanel(QtWidgets.QWidget):
+    """Left-side GUI panel that manages case selection and execution."""
+
     vtp_loaded = QtCore.Signal(str, object)
     cases_updated = QtCore.Signal(object)
 
@@ -67,9 +71,11 @@ class CasesPanel(QtWidgets.QWidget):
         self.case_table.itemSelectionChanged.connect(self.on_case_selection_changed)
 
     def logln(self, s: str):
+        """Append one log line to the panel log view."""
         self.log.appendPlainText(s)
 
     def pick_xlsx(self):
+        """Open a file picker, read case definitions, and refresh the table."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
             "Select Input File",
@@ -95,6 +101,7 @@ class CasesPanel(QtWidgets.QWidget):
         self.cases_updated.emit(self.df_cases)
 
     def _populate_case_table(self):
+        """Render loaded cases into the table widget."""
         if self.df_cases is None:
             self.case_table.clear()
             self.case_table.setRowCount(0)
@@ -127,6 +134,7 @@ class CasesPanel(QtWidgets.QWidget):
         self.case_table.resizeColumnsToContents()
 
     def on_case_selection_changed(self):
+        """Auto-load a matching VTP for the first selected case, if available."""
         if self.df_cases is None:
             return
         sel = self.case_table.selectionModel().selectedRows()
@@ -163,6 +171,7 @@ class CasesPanel(QtWidgets.QWidget):
             self.vtp_loaded.emit(str(vtp_path), poly)
 
     def run_selected(self):
+        """Run selected rows (or all rows) and write result CSV to chosen path."""
         if self.df_cases is None or self.xlsx_path is None:
             return
 

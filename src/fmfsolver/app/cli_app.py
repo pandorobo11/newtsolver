@@ -1,3 +1,5 @@
+"""Command-line interface for running FMF cases without the GUI."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,6 +11,7 @@ from ..io.io_cases import read_cases
 
 
 def _parse_case_ids(values: list[str] | None) -> set[str] | None:
+    """Parse ``--cases`` values into a normalized set of case IDs."""
     if not values:
         return None
     case_ids: set[str] = set()
@@ -21,6 +24,7 @@ def _parse_case_ids(values: list[str] | None) -> set[str] | None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create the CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="fmfsolver-cli",
         description="Run FMF solver from CSV/Excel input without GUI.",
@@ -54,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run selected cases from an input table and write a result CSV."""
     parser = build_parser()
     args = parser.parse_args(argv)
 

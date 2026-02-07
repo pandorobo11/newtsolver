@@ -1,3 +1,5 @@
+"""Top-level GUI window wiring cases and viewer panels."""
+
 from __future__ import annotations
 
 from PySide6 import QtCore, QtWidgets
@@ -7,6 +9,8 @@ from .viewer import ViewerPanel
 
 
 class MainWindow(QtWidgets.QMainWindow):
+    """Main application window for the FMF solver GUI."""
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sentman FMF Solver (GUI)")

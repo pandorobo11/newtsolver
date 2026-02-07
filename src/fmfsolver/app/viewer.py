@@ -1,3 +1,5 @@
+"""VTP viewer panel and visualization controls for the GUI."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +13,8 @@ from .ui_utils import format_case_text
 
 
 class ViewerPanel(QtWidgets.QWidget):
+    """Right-side panel that renders VTP results and camera controls."""
+
     log_message = QtCore.Signal(str)
 
     def __init__(self, parent=None):
@@ -188,29 +192,36 @@ class ViewerPanel(QtWidgets.QWidget):
         self.btn_save_image.clicked.connect(self.save_view_image)
 
     def logln(self, s: str):
+        """Emit a message to the shared GUI log."""
         self.log_message.emit(s)
 
     def set_cases_df(self, df):
+        """Store loaded case table for overlay lookup by case_id."""
         self.df_cases = df
 
     def clear_range(self):
+        """Reset scalar colorbar limits to automatic range."""
         self.edit_vmin.setText("")
         self.edit_vmax.setText("")
         self.update_view()
 
     def set_view_vector(self, vec):
+        """Set camera direction to a Cartesian view vector."""
         self.plotter.view_vector(vec)
         self.plotter.render()
 
     def set_view_iso_1(self):
+        """Set camera to ISO view ``(-X, -Y, +Z)``."""
         self.plotter.view_vector((-1, -1, 1))
         self.plotter.render()
 
     def set_view_iso_2(self):
+        """Set camera to ISO view ``(+X, -Y, -Z)``."""
         self.plotter.view_vector((1, -1, -1))
         self.plotter.render()
 
     def save_view_image(self):
+        """Save the current viewport image to a user-selected file."""
         if self.plotter is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -231,6 +242,7 @@ class ViewerPanel(QtWidgets.QWidget):
     # VTP view
     # -------------------------
     def open_vtp(self):
+        """Open a VTP file from disk and display it."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "Open VTP", str(Path.cwd()), "VTK PolyData (*.vtp)"
         )
@@ -239,6 +251,7 @@ class ViewerPanel(QtWidgets.QWidget):
         self.load_vtp(path)
 
     def load_vtp(self, path: str, poly: pv.PolyData | None = None):
+        """Load VTP data, resolve case context, and refresh rendering."""
         if poly is None:
             try:
                 self._poly = pv.read(path)
@@ -267,6 +280,7 @@ class ViewerPanel(QtWidgets.QWidget):
         self.update_view()
 
     def _get_clim(self, poly: pv.PolyData, scalar: str):
+        """Determine colorbar limits from UI inputs and scalar data."""
         if scalar == "shielded":
             return (0.0, 1.0)
         if scalar not in poly.cell_data:
@@ -289,6 +303,7 @@ class ViewerPanel(QtWidgets.QWidget):
             return (float(np.nanmin(arr)), float(np.nanmax(arr)))
 
     def _update_overlay(self):
+        """Update the corner text overlay with the active case summary."""
         if self._overlay_actor is not None:
             try:
                 self.plotter.remove_actor(self._overlay_actor)
@@ -312,6 +327,7 @@ class ViewerPanel(QtWidgets.QWidget):
         self._overlay_actor = self.plotter.add_text(txt, position="upper_left", font_size=10)
 
     def update_view(self):
+        """Redraw the current mesh with selected scalar, style, and camera."""
         if self._poly is None:
             return
 

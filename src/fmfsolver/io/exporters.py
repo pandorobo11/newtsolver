@@ -1,3 +1,5 @@
+"""Writers for mesh and array artifacts produced by the solver."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,6 +15,7 @@ def export_vtp(
     cell_data: dict,
     field_data: dict | None = None,
 ):
+    """Write face-based solver outputs as a VTP PolyData file."""
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -33,6 +36,7 @@ def export_vtp(
 
 
 def export_npz(out_path: str, **arrays):
+    """Write multiple named arrays into a compressed NPZ file."""
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(str(out), **arrays)

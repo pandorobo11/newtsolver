@@ -1,3 +1,5 @@
+"""Input readers for case definition tables."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,6 +31,17 @@ DEFAULTS = {
 
 
 def read_cases(path: str) -> pd.DataFrame:
+    """Load solver cases from CSV/Excel and normalize optional columns.
+
+    Args:
+        path: Input table path (`.csv`, `.xlsx`, `.xlsm`, or `.xls`).
+
+    Returns:
+        DataFrame containing required columns and default-filled optional ones.
+
+    Raises:
+        ValueError: If the file format is unsupported or required columns are missing.
+    """
     p = Path(path).expanduser()
     suffix = p.suffix.lower()
     if suffix == ".csv":

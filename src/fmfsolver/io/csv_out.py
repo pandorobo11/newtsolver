@@ -1,3 +1,5 @@
+"""CSV output writer for aggregated case results."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,6 +8,11 @@ import pandas as pd
 
 
 def write_results_csv(out_path: str, df_in: pd.DataFrame, df_out: pd.DataFrame):
+    """Write merged input/result rows to a single CSV file.
+
+    Result-side columns that overlap selected input names are prefixed with
+    ``out_`` to avoid collisions.
+    """
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
