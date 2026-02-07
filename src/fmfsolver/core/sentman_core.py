@@ -10,13 +10,16 @@ import numpy as np
 def vhat_from_alpha_beta_stl(alpha_deg: float, beta_deg: float) -> np.ndarray:
     """Return freestream unit vector in STL axes from aerodynamic angles.
 
-    Definitions:
-      tan(alpha) = Vz / Vx
-      tan(beta)  = Vy / Vx
+    Let ``Vhat = [Vx_stl, Vy_stl, Vz_stl]`` with ``|Vhat| = 1``.
+    The implementation uses:
 
-    Convention fix:
-      For V>0, beta>0 should correspond to wind blowing toward -Y (Vy negative).
-      Therefore we set Vy ∝ -tan(beta).
+    ``Vhat = normalize([1, -tan(beta), tan(alpha)])``
+
+    where ``alpha = radians(alpha_deg)`` and ``beta = radians(beta_deg)``.
+    Therefore, in STL axes:
+
+    - ``tan(alpha) = Vz_stl / Vx_stl``
+    - ``tan(beta) = -Vy_stl / Vx_stl``
 
     Args:
         alpha_deg: Angle of attack in degrees.
