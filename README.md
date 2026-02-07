@@ -201,6 +201,8 @@ https://www.pdas.com/bigtables.html
 - Versioning follows SemVer (`MAJOR.MINOR.PATCH`).
 - Update the version only for release commits (not every commit).
 - Use tag format `vX.Y.Z` and keep tag/version consistent.
+- GitHub Release is auto-created when `vX.Y.Z` tag is pushed.
+- Release includes build artifacts from `uv build` (`.whl` and `.tar.gz`).
 - See `RELEASE.md` for the full release workflow.
 
 ## Dependency Note

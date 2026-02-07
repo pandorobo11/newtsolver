@@ -37,9 +37,11 @@ This file defines the release operation for `fmfsolver`.
    git push
    git push origin vX.Y.Z
    ```
-6. Create GitHub Release from the tag and add release notes.
+6. GitHub Actions runs `uv build`, then automatically creates a GitHub Release for the pushed `vX.Y.Z` tag, attaching `dist/*.whl` and `dist/*.tar.gz`.
+7. Review the generated release notes on GitHub and edit if needed.
 
 ## Notes
 
-- CI checks that tag `vX.Y.Z` matches `pyproject.toml` version.
+- CI checks that tag `vX.Y.Z` matches `pyproject.toml` version before release creation.
+- Release creation and build artifact upload are handled by `.github/workflows/ci.yml` (tag push trigger).
 - If you need a prerelease, use a separate branch strategy; this repository currently tracks stable SemVer releases in `pyproject.toml`.
