@@ -1,0 +1,16 @@
+solid square_plate_area1_minusX_offset_x2
+  facet normal -1.000000 0.000000 0.000000
+    outer loop
+      vertex 2.000000 -0.500000 -0.500000
+      vertex 2.000000 -0.500000 0.500000
+      vertex 2.000000 0.500000 0.500000
+    endloop
+  endfacet
+  facet normal -1.000000 0.000000 0.000000
+    outer loop
+      vertex 2.000000 -0.500000 -0.500000
+      vertex 2.000000 0.500000 0.500000
+      vertex 2.000000 0.500000 -0.500000
+    endloop
+  endfacet
+endsolid square_plate_area1_minusX_offset_x2

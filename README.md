@@ -113,7 +113,9 @@ Practical note:
 
 - `samples/input_template.csv`
 - `samples/stl/cube.stl`
+- `samples/stl/capsule.stl`
 - `samples/stl/plate.stl`
+- `samples/stl/plate_offset_x2.stl`
 - `samples/stl/double_plate.stl`
 
 ## GUI Manual (Simple)
