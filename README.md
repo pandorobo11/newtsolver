@@ -126,7 +126,7 @@ Main areas:
 - Right panel: VTP viewer and visualization controls
 
 Viewer controls:
-- Scalar: `Cp_n`, `shielded`, `theta_deg`, `area_m2`, center coordinates
+- Scalar: `Cp_n`, `shielded`, `theta_deg`, `area_m2`, center coordinates, `stl_index`
 - Colorbar range: `vmin` / `vmax` (blank = auto), `Auto range`
 - Camera: axis views, two ISO views, and `Save Image...`
 - `Open VTP...`: open an existing VTP file manually
@@ -165,6 +165,10 @@ uv run fmfsolver-cli --input samples/input_template.csv -o outputs/custom_result
 - Result summary CSV:
   - default: `outputs/<input_stem>_result.csv` (CLI)
   - GUI: chosen in save dialog
+  - for multi-STL cases, includes one `scope=total` row and one `scope=component` row per STL
+  - component rows include:
+    - `component_id`
+    - `component_stl_path`
   - includes traceability columns:
     - `solver_version`
     - `case_signature`
@@ -173,6 +177,7 @@ uv run fmfsolver-cli --input samples/input_template.csv -o outputs/custom_result
     - `run_elapsed_s`
 - Per-case VTP:
   - `<out_dir>/<case_id>.vtp` when `save_vtp_on=1`
+  - includes `stl_index` in cell data for per-face source STL identification
 - Optional NPZ:
   - `<out_dir>/<case_id>.npz` when `save_npz_on=1`
 

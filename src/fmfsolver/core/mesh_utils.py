@@ -21,12 +21,16 @@ class MeshData:
         centers_m: Triangle centers [m], shape ``(n_faces, 3)``.
         normals_out: Outward face normals (unit vectors), shape ``(n_faces, 3)``.
         areas_m2: Face areas [m^2], shape ``(n_faces,)``.
+        face_stl_index: Source STL index per face, shape ``(n_faces,)``.
+        stl_paths_order: Absolute STL paths in concatenation order.
     """
 
     mesh: trimesh.Trimesh
     centers_m: np.ndarray
     normals_out: np.ndarray
     areas_m2: np.ndarray
+    face_stl_index: np.ndarray
+    stl_paths_order: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -58,11 +62,19 @@ def _mesh_cache_key(stl_paths: List[str], scale_m_per_unit: float) -> tuple:
 def _load_meshes_uncached(stl_paths: List[str], scale_m_per_unit: float, logfn) -> MeshData:
     """Load mesh data from disk and compute per-face geometric arrays."""
     meshes = []
+    stl_paths_order = tuple(str(Path(p).expanduser().resolve()) for p in stl_paths)
     for p in stl_paths:
         m = trimesh.load_mesh(Path(p).expanduser(), force="mesh")
         if isinstance(m, trimesh.Scene):
             m = trimesh.util.concatenate(tuple(m.geometry.values()))
         meshes.append(m)
+
+    face_stl_index = np.concatenate(
+        [
+            np.full(len(m.faces), i, dtype=np.int32)
+            for i, m in enumerate(meshes)
+        ]
+    )
 
     mesh = trimesh.util.concatenate(meshes) if len(meshes) > 1 else meshes[0]
     mesh.vertices = mesh.vertices.astype(float) * float(scale_m_per_unit)
@@ -86,7 +98,14 @@ def _load_meshes_uncached(stl_paths: List[str], scale_m_per_unit: float, logfn) 
     centers = mesh.triangles_center.astype(float)
     normals = mesh.face_normals.astype(float)
     areas = mesh.area_faces.astype(float)
-    return MeshData(mesh=mesh, centers_m=centers, normals_out=normals, areas_m2=areas)
+    return MeshData(
+        mesh=mesh,
+        centers_m=centers,
+        normals_out=normals,
+        areas_m2=areas,
+        face_stl_index=face_stl_index,
+        stl_paths_order=stl_paths_order,
+    )
 
 
 def clear_mesh_cache(reset_stats: bool = True) -> None:

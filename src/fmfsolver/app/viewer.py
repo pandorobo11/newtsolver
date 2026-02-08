@@ -47,6 +47,7 @@ class ViewerPanel(QtWidgets.QWidget):
                 "center_x_stl_m",
                 "center_y_stl_m",
                 "center_z_stl_m",
+                "stl_index",
             ]
         )
 

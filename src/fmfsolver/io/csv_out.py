@@ -16,11 +16,24 @@ def write_results_csv(out_path: str, df_in: pd.DataFrame, df_out: pd.DataFrame):
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    df_out2 = df_out.copy()
-    for col in ["mode", "S", "Ti_K"]:
-        if col in df_in.columns and col in df_out2.columns:
-            df_out2.rename(columns={col: f"out_{col}"}, inplace=True)
+    df_in2 = df_in.reset_index(drop=True).copy()
+    if "case_id" in df_in2.columns:
+        df_in2["case_id"] = df_in2["case_id"].astype(str)
 
-    combined = pd.concat([df_in.reset_index(drop=True), df_out2.reset_index(drop=True)], axis=1)
+    df_out2 = df_out.reset_index(drop=True).copy()
+    if "case_id" in df_out2.columns:
+        df_out2["case_id"] = df_out2["case_id"].astype(str)
+
+    overlap_cols = [c for c in df_out2.columns if c in df_in2.columns and c != "case_id"]
+    if overlap_cols:
+        df_out2.rename(columns={c: f"out_{c}" for c in overlap_cols}, inplace=True)
+
+    if "case_id" in df_out2.columns and "case_id" in df_in2.columns:
+        combined = df_out2.merge(df_in2, on="case_id", how="left", sort=False)
+        input_cols = list(df_in2.columns)
+        out_cols = [c for c in combined.columns if c not in input_cols]
+        combined = combined[input_cols + out_cols]
+    else:
+        combined = pd.concat([df_in2, df_out2], axis=1)
 
     combined.to_csv(out, index=False)

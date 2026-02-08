@@ -143,6 +143,39 @@ def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
     return S, Ti, "B"
 
 
+def _compute_force_coeffs(C_force_stl: np.ndarray, alpha_deg: float) -> dict[str, float]:
+    """Convert force vector in STL axes into force coefficients."""
+    C_force_body = stl_to_body(C_force_stl)
+    CA = -float(C_force_body[0])
+    CY = float(C_force_body[1])
+    CN = -float(C_force_body[2])
+
+    Ry = rot_y(math.radians(alpha_deg))
+    C_stab = Ry @ C_force_body
+    CD = -float(C_stab[0])
+    CL = -float(C_stab[2])
+    return {
+        "C_force_body": C_force_body,
+        "CA": CA,
+        "CY": CY,
+        "CN": CN,
+        "CD": CD,
+        "CL": CL,
+    }
+
+
+def _expand_case_rows(case_result: dict) -> list[dict]:
+    """Expand one case result into CSV rows (total + component rows)."""
+    total = dict(case_result)
+    components = list(total.pop("component_rows", []))
+    rows = [total]
+    for comp in components:
+        row = dict(total)
+        row.update(comp)
+        rows.append(row)
+    return rows
+
+
 def run_case(row: dict, logfn) -> dict:
     """Run a single aerodynamic case and return summary outputs.
 
@@ -194,6 +227,8 @@ def run_case(row: dict, logfn) -> dict:
     centers_stl = md.centers_m
     normals_out_stl = md.normals_out
     areas = md.areas_m2
+    face_stl_index = md.face_stl_index
+    stl_paths_order = md.stl_paths_order
 
     if shielding_on:
         shielded = compute_shield_mask(mesh, centers_stl, Vhat)
@@ -205,6 +240,8 @@ def run_case(row: dict, logfn) -> dict:
     theta_deg = np.zeros(len(areas), dtype=float)
 
     C_force_stl = np.zeros(3, dtype=float)
+    num_components = len(stl_paths_order)
+    C_force_stl_by_component = np.zeros((num_components, 3), dtype=float)
 
     for i in range(len(areas)):
         dot_nv = float(np.dot(normals_out_stl[i], Vhat))
@@ -224,31 +261,63 @@ def run_case(row: dict, logfn) -> dict:
         Ci = dC_dA * areas[i]
         C_face_stl[i] = Ci
         C_force_stl += Ci
+        C_force_stl_by_component[int(face_stl_index[i])] += Ci
 
         Cp_n[i] = -(Aref / areas[i]) * float(np.dot(Ci, normals_out_stl[i]))
 
-    C_force_body = stl_to_body(C_force_stl)
-
-    CA = -float(C_force_body[0])
-    CY = float(C_force_body[1])
-    CN = -float(C_force_body[2])
-
     C_M_body = np.zeros(3, dtype=float)
+    C_M_body_by_component = np.zeros((num_components, 3), dtype=float)
     for i in range(len(areas)):
         center_body = stl_to_body(centers_stl[i])
         r = center_body - ref_body
         C_face_body = stl_to_body(C_face_stl[i])
-        C_M_body += np.cross(r, C_face_body)
+        dM = np.cross(r, C_face_body)
+        C_M_body += dM
+        C_M_body_by_component[int(face_stl_index[i])] += dM
+
+    total_force_coeffs = _compute_force_coeffs(C_force_stl, alpha_deg)
+    C_force_body = total_force_coeffs["C_force_body"]
+    CA = total_force_coeffs["CA"]
+    CY = total_force_coeffs["CY"]
+    CN = total_force_coeffs["CN"]
+    CD = total_force_coeffs["CD"]
+    CL = total_force_coeffs["CL"]
 
     Cl = float(C_M_body[0]) / Lref_Cl
     Cm = float(C_M_body[1]) / Lref_Cm
     Cn = float(C_M_body[2]) / Lref_Cn
 
-    Ry = rot_y(math.radians(alpha_deg))
-    C_stab = Ry @ C_force_body
-
-    CD = -float(C_stab[0])
-    CL = -float(C_stab[2])
+    component_faces = np.bincount(face_stl_index, minlength=num_components).astype(int)
+    component_shielded_faces = np.bincount(
+        face_stl_index,
+        weights=shielded.astype(np.int64),
+        minlength=num_components,
+    ).astype(int)
+    component_rows = []
+    if num_components > 1:
+        for comp_i in range(num_components):
+            coeffs = _compute_force_coeffs(C_force_stl_by_component[comp_i], alpha_deg)
+            C_M_comp = C_M_body_by_component[comp_i]
+            component_rows.append(
+                {
+                    "scope": "component",
+                    "component_id": int(comp_i),
+                    "component_stl_path": stl_paths_order[comp_i],
+                    "CA": coeffs["CA"],
+                    "CY": coeffs["CY"],
+                    "CN": coeffs["CN"],
+                    "Cl": float(C_M_comp[0]) / Lref_Cl,
+                    "Cm": float(C_M_comp[1]) / Lref_Cm,
+                    "Cn": float(C_M_comp[2]) / Lref_Cn,
+                    "CD": coeffs["CD"],
+                    "CL": coeffs["CL"],
+                    "faces": int(component_faces[comp_i]),
+                    "shielded_faces": int(component_shielded_faces[comp_i]),
+                    # Keep paths only in total row for easier downstream handling.
+                    "vtp_path": "",
+                    "npz_path": "",
+                }
+            )
 
     vtp_path = out_dir / f"{case_id}.vtp"
     npz_path = out_dir / f"{case_id}.npz"
@@ -264,6 +333,7 @@ def run_case(row: dict, logfn) -> dict:
             "center_x_stl_m": centers_stl[:, 0],
             "center_y_stl_m": centers_stl[:, 1],
             "center_z_stl_m": centers_stl[:, 2],
+            "stl_index": face_stl_index.astype(np.int32),
         }
         export_vtp(
             str(vtp_path),
@@ -274,6 +344,8 @@ def run_case(row: dict, logfn) -> dict:
                 "case_id": case_id,
                 "case_signature": signature,
                 "solver_version": SOLVER_VERSION,
+                "stl_count": int(num_components),
+                "stl_paths_json": json.dumps(list(stl_paths_order), ensure_ascii=True),
             },
         )
 
@@ -303,6 +375,8 @@ def run_case(row: dict, logfn) -> dict:
             CD=CD,
             CL=CL,
             Cp_n=Cp_n,
+            face_stl_index=face_stl_index,
+            stl_paths=np.array(stl_paths_order, dtype=object),
         )
 
     finished_at_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -319,6 +393,9 @@ def run_case(row: dict, logfn) -> dict:
         "S": float(S),
         "Ti_K": float(Ti),
         "Tw_K": float(Tw),
+        "scope": "total",
+        "component_id": "",
+        "component_stl_path": "",
         "CA": CA,
         "CY": CY,
         "CN": CN,
@@ -331,6 +408,7 @@ def run_case(row: dict, logfn) -> dict:
         "shielded_faces": int(shielded.sum()),
         "vtp_path": str(vtp_path) if save_vtp else "",
         "npz_path": str(npz_path) if save_npz else "",
+        "component_rows": component_rows,
     }
 
 def _null_log(_msg: str):
@@ -373,13 +451,14 @@ def run_cases(
             if cancel_cb is not None and cancel_cb():
                 raise RuntimeError("Canceled by user.")
             logfn(f"[RUN] ({i}/{total}) case_id={r['case_id']}")
-            rows.append(run_case(r.to_dict(), logfn))
+            case_result = run_case(r.to_dict(), logfn)
+            rows.extend(_expand_case_rows(case_result))
             if progress_cb is not None:
                 progress_cb(i, total)
         return pd.DataFrame(rows)
 
     logfn(f"[RUN] Parallel execution with {workers} worker(s)")
-    rows = [None] * total
+    case_rows = [None] * total
     done_count = 0
     canceled = False
     ex = ProcessPoolExecutor(max_workers=workers)
@@ -405,7 +484,7 @@ def run_cases(
             for fut in done:
                 i = futures.pop(fut)
                 try:
-                    rows[i] = fut.result()
+                    case_rows[i] = _expand_case_rows(fut.result())
                     done_count += 1
                     logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[i, 'case_id']}")
                     if progress_cb is not None:
@@ -423,4 +502,8 @@ def run_cases(
     if canceled:
         raise RuntimeError("Canceled by user.")
 
+    rows = []
+    for bucket in case_rows:
+        if bucket:
+            rows.extend(bucket)
     return pd.DataFrame(rows)
