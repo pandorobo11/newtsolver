@@ -21,7 +21,7 @@ from ..physics.us1976 import mean_to_most_probable_speed, sample_at_altitude_km
 from .mesh_utils import load_meshes
 from .sentman_core import (
     rot_y,
-    sentman_dC_dA_vector,
+    sentman_dC_dA_vectors,
     stl_to_body,
     vhat_from_alpha_beta_stl,
 )
@@ -265,19 +265,16 @@ def run_case(row: dict, logfn) -> dict:
         shielded = np.zeros(len(areas), dtype=bool)
 
     n_faces = len(areas)
-    dC_dA_arr = np.zeros((n_faces, 3), dtype=float)
     num_components = len(stl_paths_order)
-    for i in range(n_faces):
-        dC_dA = sentman_dC_dA_vector(
-            Vhat=Vhat,
-            n_out=normals_out_stl[i],
-            S=S,
-            Ti=Ti,
-            Tw=Tw,
-            Aref=Aref,
-            shielded=shielded[i],
-        )
-        dC_dA_arr[i] = dC_dA
+    dC_dA_arr = sentman_dC_dA_vectors(
+        Vhat=Vhat,
+        n_out=normals_out_stl,
+        S=S,
+        Ti=Ti,
+        Tw=Tw,
+        Aref=Aref,
+        shielded=shielded,
+    )
 
     C_face_stl = dC_dA_arr * areas[:, None]
     C_force_stl = C_face_stl.sum(axis=0)

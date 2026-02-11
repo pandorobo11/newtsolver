@@ -5,7 +5,12 @@ import unittest
 
 import numpy as np
 
-from fmfsolver.core.sentman_core import sentman_dC_dA_vector, stl_to_body, vhat_from_alpha_beta_stl
+from fmfsolver.core.sentman_core import (
+    sentman_dC_dA_vector,
+    sentman_dC_dA_vectors,
+    stl_to_body,
+    vhat_from_alpha_beta_stl,
+)
 
 
 class TestSentmanCore(unittest.TestCase):
@@ -38,6 +43,43 @@ class TestSentmanCore(unittest.TestCase):
         v_stl = np.array([2.0, -3.0, 4.5], dtype=float)
         v_body = stl_to_body(v_stl)
         np.testing.assert_allclose(v_body, np.array([-2.0, -3.0, -4.5]), rtol=0.0, atol=0.0)
+
+    def test_sentman_vectors_matches_scalar(self):
+        Vhat = vhat_from_alpha_beta_stl(10.0, -5.0)
+        n_out = np.array(
+            [
+                [-1.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0],
+                [0.0, 0.0, -1.0],
+                [1.0, 0.0, 0.0],
+            ],
+            dtype=float,
+        )
+        shielded = np.array([False, True, False, False], dtype=bool)
+        vec = sentman_dC_dA_vectors(
+            Vhat=Vhat,
+            n_out=n_out,
+            S=5.0,
+            Ti=300.0,
+            Tw=450.0,
+            Aref=2.0,
+            shielded=shielded,
+        )
+        ref = np.vstack(
+            [
+                sentman_dC_dA_vector(
+                    Vhat=Vhat,
+                    n_out=n_out[i],
+                    S=5.0,
+                    Ti=300.0,
+                    Tw=450.0,
+                    Aref=2.0,
+                    shielded=bool(shielded[i]),
+                )
+                for i in range(n_out.shape[0])
+            ]
+        )
+        np.testing.assert_allclose(vec, ref, rtol=0.0, atol=1e-13)
 
 
 if __name__ == "__main__":

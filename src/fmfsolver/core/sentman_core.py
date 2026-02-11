@@ -7,6 +7,12 @@ import math
 import numpy as np
 
 
+def _erf_array(x: np.ndarray) -> np.ndarray:
+    """Evaluate ``erf`` element-wise for a float array."""
+    x = np.asarray(x, dtype=float)
+    return np.fromiter((math.erf(float(v)) for v in x), dtype=float, count=x.size)
+
+
 def vhat_from_alpha_beta_stl(alpha_deg: float, beta_deg: float) -> np.ndarray:
     """Return freestream unit vector in STL axes from aerodynamic angles.
 
@@ -99,6 +105,75 @@ def sentman_dC_dA_vector(
 
     dC_dA = (A * Vhat + (B + C) * n_in) / float(Aref)
     return dC_dA
+
+
+def sentman_dC_dA_vectors(
+    Vhat: np.ndarray,
+    n_out: np.ndarray,
+    S: float,
+    Ti: float,
+    Tw: float,
+    Aref: float,
+    shielded: np.ndarray | bool = False,
+) -> np.ndarray:
+    """Compute ``dC/dA`` for multiple panels in one call.
+
+    Args:
+        Vhat: Freestream unit vector in STL axes, shape ``(3,)``.
+        n_out: Outward panel normals in STL axes, shape ``(N, 3)``.
+        S: Molecular speed ratio.
+        Ti: Free-stream translational temperature [K].
+        Tw: Wall temperature [K].
+        Aref: Reference area [m^2] for non-dimensionalization.
+        shielded: Shield mask. Scalar bool or bool array of shape ``(N,)``.
+
+    Returns:
+        Force-coefficient density vectors in STL axes, shape ``(N, 3)``.
+        Shielded rows are zeros.
+    """
+    Vhat = np.asarray(Vhat, dtype=float)
+    n_out = np.asarray(n_out, dtype=float)
+    if n_out.ndim != 2 or n_out.shape[1] != 3:
+        raise ValueError("n_out must have shape (N, 3).")
+
+    S = float(S)
+    if S <= 0:
+        raise ValueError(f"S must be > 0, got {S}")
+
+    n_faces = int(n_out.shape[0])
+    out = np.zeros((n_faces, 3), dtype=float)
+    if n_faces == 0:
+        return out
+
+    if np.isscalar(shielded):
+        shielded_arr = np.full(n_faces, bool(shielded), dtype=bool)
+    else:
+        shielded_arr = np.asarray(shielded, dtype=bool)
+        if shielded_arr.shape != (n_faces,):
+            raise ValueError("shielded must be scalar or shape (N,).")
+
+    active = ~shielded_arr
+    if not np.any(active):
+        return out
+
+    n_in = -n_out[active]
+    gamma = n_in @ Vhat
+    hs = gamma * S
+    Phi = 1.0 + _erf_array(hs)
+    E = np.exp(-(hs * hs))
+
+    inv_S = 1.0 / S
+    inv_S2 = inv_S * inv_S
+    sqrt_pi = math.sqrt(math.pi)
+    sqrt_TwTi = math.sqrt(float(Tw) / float(Ti))
+
+    A = gamma * Phi + (inv_S / sqrt_pi) * E
+    B = 0.5 * inv_S2 * Phi
+    C = 0.5 * sqrt_TwTi * ((gamma * sqrt_pi * inv_S) * Phi + inv_S2 * E)
+
+    out_active = (A[:, None] * Vhat[None, :] + (B + C)[:, None] * n_in) / float(Aref)
+    out[active] = out_active
+    return out
 
 
 def stl_to_body(v_stl: np.ndarray) -> np.ndarray:
