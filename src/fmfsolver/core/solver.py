@@ -205,6 +205,36 @@ def _expand_case_rows(case_result: dict) -> list[dict]:
     return rows
 
 
+def _shield_reuse_sort_key(row: pd.Series, index: int) -> tuple:
+    """Return execution sort key to cluster reusable shield-mask cases.
+
+    Reuse condition is based on mesh identity and flow direction:
+    ``stl_path``, ``stl_scale_m_per_unit``, ``alpha_deg``, ``beta_deg``.
+    Non-shielding cases are kept after shielding cases in input order.
+    """
+    try:
+        shielding_on = bool(int(row.get("shielding_on", 0)))
+    except Exception:
+        shielding_on = False
+    if not shielding_on:
+        return (1, index)
+
+    stl_paths = tuple(p.strip() for p in str(row.get("stl_path", "")).split(";") if p.strip())
+    scale = round(float(row.get("stl_scale_m_per_unit", 1.0)), 12)
+    alpha = round(float(row.get("alpha_deg", 0.0)), 12)
+    beta = round(float(row.get("beta_deg", 0.0)), 12)
+    return (0, stl_paths, scale, alpha, beta, index)
+
+
+def _build_execution_order(df: pd.DataFrame) -> list[int]:
+    """Build case execution order optimized for shield-mask reuse."""
+    n = int(len(df))
+    if n <= 1:
+        return list(range(n))
+    indices = list(range(n))
+    return sorted(indices, key=lambda i: _shield_reuse_sort_key(df.iloc[i], i))
+
+
 def run_case(row: dict, logfn) -> dict:
     """Run a single aerodynamic case and return summary outputs.
 
@@ -472,6 +502,7 @@ def run_cases(
     if cancel_cb is not None and cancel_cb():
         raise RuntimeError("Canceled by user.")
     _maybe_log_ray_accel_hint(logfn)
+    exec_order = _build_execution_order(df)
 
     chunk_rows: list[dict] = []
     pending_cases = 0
@@ -492,21 +523,26 @@ def run_cases(
         pending_cases = 0
 
     if workers <= 1 or total <= 1:
-        rows = []
+        case_rows = [None] * total
         done_count = 0
-        for i, (_, r) in enumerate(df.iterrows(), start=1):
+        for run_idx, i in enumerate(exec_order, start=1):
             if cancel_cb is not None and cancel_cb():
                 raise RuntimeError("Canceled by user.")
-            logfn(f"[RUN] ({i}/{total}) case_id={r['case_id']}")
+            r = df.iloc[i]
+            logfn(f"[RUN] ({run_idx}/{total}) case_id={r['case_id']}")
             case_result = run_case(r.to_dict(), logfn)
             expanded = _expand_case_rows(case_result)
-            rows.extend(expanded)
+            case_rows[i] = expanded
             done_count += 1
             chunk_rows.extend(expanded)
             pending_cases += 1
             _emit_chunk(force=False)
             if progress_cb is not None:
-                progress_cb(i, total)
+                progress_cb(done_count, total)
+        rows = []
+        for bucket in case_rows:
+            if bucket:
+                rows.extend(bucket)
         _emit_chunk(force=True)
         return pd.DataFrame(rows)
 
@@ -517,10 +553,11 @@ def run_cases(
     ex = ProcessPoolExecutor(max_workers=workers)
     try:
         futures = {}
-        for i, (_, r) in enumerate(df.iterrows()):
+        for i in exec_order:
             if cancel_cb is not None and cancel_cb():
                 canceled = True
                 break
+            r = df.iloc[i]
             futures[ex.submit(_run_case_worker, r.to_dict())] = i
 
         while futures and not canceled:

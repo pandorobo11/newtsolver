@@ -8,11 +8,104 @@ from pathlib import Path
 import pandas as pd
 import pyvista as pv
 
-from fmfsolver.core.solver import build_case_signature, run_case, run_cases
+from fmfsolver.core.solver import _build_execution_order, build_case_signature, run_case, run_cases
 from fmfsolver.io.csv_out import append_results_csv, write_results_csv
 
 
 class TestSolverPipeline(unittest.TestCase):
+    def test_build_execution_order_clusters_reusable_shield_cases(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "case_id": "off_1",
+                    "stl_path": "samples/stl/cube.stl",
+                    "stl_scale_m_per_unit": 1.0,
+                    "alpha_deg": 0.0,
+                    "beta_deg": 0.0,
+                    "shielding_on": 0,
+                },
+                {
+                    "case_id": "on_a1",
+                    "stl_path": "samples/stl/cube.stl",
+                    "stl_scale_m_per_unit": 1.0,
+                    "alpha_deg": 5.0,
+                    "beta_deg": 0.0,
+                    "shielding_on": 1,
+                },
+                {
+                    "case_id": "on_b",
+                    "stl_path": "samples/stl/cube.stl",
+                    "stl_scale_m_per_unit": 1.0,
+                    "alpha_deg": 10.0,
+                    "beta_deg": 0.0,
+                    "shielding_on": 1,
+                },
+                {
+                    "case_id": "on_a2",
+                    "stl_path": "samples/stl/cube.stl",
+                    "stl_scale_m_per_unit": 1.0,
+                    "alpha_deg": 5.0,
+                    "beta_deg": 0.0,
+                    "shielding_on": 1,
+                },
+            ]
+        )
+        order = _build_execution_order(df)
+        ordered_ids = [str(df.iloc[i]["case_id"]) for i in order]
+        self.assertEqual(ordered_ids, ["on_a1", "on_a2", "on_b", "off_1"])
+
+    def test_run_cases_returns_rows_in_input_order_even_if_execution_reordered(self):
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+            df = pd.DataFrame(
+                [
+                    {
+                        "case_id": "first",
+                        "stl_path": "samples/stl/cube.stl",
+                        "stl_scale_m_per_unit": 1.0,
+                        "alpha_deg": 10.0,
+                        "beta_deg": 0.0,
+                        "Tw_K": 300.0,
+                        "ref_x_m": 0.0,
+                        "ref_y_m": 0.0,
+                        "ref_z_m": 0.0,
+                        "Aref_m2": 1.0,
+                        "Lref_Cl_m": 1.0,
+                        "Lref_Cm_m": 1.0,
+                        "Lref_Cn_m": 1.0,
+                        "S": 5.0,
+                        "Ti_K": 300.0,
+                        "shielding_on": 1,
+                        "save_vtp_on": 0,
+                        "save_npz_on": 0,
+                        "out_dir": td,
+                    },
+                    {
+                        "case_id": "second",
+                        "stl_path": "samples/stl/cube.stl",
+                        "stl_scale_m_per_unit": 1.0,
+                        "alpha_deg": 5.0,
+                        "beta_deg": 0.0,
+                        "Tw_K": 300.0,
+                        "ref_x_m": 0.0,
+                        "ref_y_m": 0.0,
+                        "ref_z_m": 0.0,
+                        "Aref_m2": 1.0,
+                        "Lref_Cl_m": 1.0,
+                        "Lref_Cm_m": 1.0,
+                        "Lref_Cn_m": 1.0,
+                        "S": 5.0,
+                        "Ti_K": 300.0,
+                        "shielding_on": 1,
+                        "save_vtp_on": 0,
+                        "save_npz_on": 0,
+                        "out_dir": td,
+                    },
+                ]
+            )
+            res = run_cases(df, lambda _msg: None, workers=1)
+            got = res[res["scope"] == "total"]["case_id"].tolist()
+            self.assertEqual(got, ["first", "second"])
+
     def test_build_case_signature_numeric_normalization(self):
         row_int = {
             "case_id": "sig_case",
