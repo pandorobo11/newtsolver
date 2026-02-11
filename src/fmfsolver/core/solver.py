@@ -446,6 +446,8 @@ def run_cases(
     workers: int = 1,
     progress_cb: Callable[[int, int], None] | None = None,
     cancel_cb: Callable[[], bool] | None = None,
+    flush_every_cases: int | None = None,
+    chunk_cb: Callable[[pd.DataFrame, int, int, bool], None] | None = None,
 ) -> pd.DataFrame:
     """Run multiple cases sequentially or in parallel.
 
@@ -455,26 +457,57 @@ def run_cases(
         workers: Process count for case-level parallel execution.
         progress_cb: Optional callback receiving ``(done, total)``.
         cancel_cb: Optional callback returning ``True`` to request cancellation.
+        flush_every_cases: Optional case count for chunk callbacks.
+        chunk_cb: Optional callback receiving chunk dataframe and
+            ``(done, total, is_final_chunk)``.
 
     Returns:
         Dataframe of per-case summary results, preserving input row order.
     """
     df = df.reset_index(drop=True)
     total = len(df)
+    flush_every = int(flush_every_cases or 0)
+    if flush_every < 0:
+        raise ValueError("flush_every_cases must be >= 0.")
     if cancel_cb is not None and cancel_cb():
         raise RuntimeError("Canceled by user.")
     _maybe_log_ray_accel_hint(logfn)
 
+    chunk_rows: list[dict] = []
+    pending_cases = 0
+
+    def _emit_chunk(force: bool = False) -> None:
+        nonlocal chunk_rows, pending_cases
+        if chunk_cb is None:
+            return
+        if not chunk_rows:
+            return
+        if not force and flush_every <= 0:
+            return
+        if not force and pending_cases < flush_every:
+            return
+        chunk_df = pd.DataFrame(chunk_rows)
+        chunk_cb(chunk_df, done_count, total, bool(force))
+        chunk_rows = []
+        pending_cases = 0
+
     if workers <= 1 or total <= 1:
         rows = []
+        done_count = 0
         for i, (_, r) in enumerate(df.iterrows(), start=1):
             if cancel_cb is not None and cancel_cb():
                 raise RuntimeError("Canceled by user.")
             logfn(f"[RUN] ({i}/{total}) case_id={r['case_id']}")
             case_result = run_case(r.to_dict(), logfn)
-            rows.extend(_expand_case_rows(case_result))
+            expanded = _expand_case_rows(case_result)
+            rows.extend(expanded)
+            done_count += 1
+            chunk_rows.extend(expanded)
+            pending_cases += 1
+            _emit_chunk(force=False)
             if progress_cb is not None:
                 progress_cb(i, total)
+        _emit_chunk(force=True)
         return pd.DataFrame(rows)
 
     logfn(f"[RUN] Parallel execution with {workers} worker(s)")
@@ -504,8 +537,12 @@ def run_cases(
             for fut in done:
                 i = futures.pop(fut)
                 try:
-                    case_rows[i] = _expand_case_rows(fut.result())
+                    expanded = _expand_case_rows(fut.result())
+                    case_rows[i] = expanded
                     done_count += 1
+                    chunk_rows.extend(expanded)
+                    pending_cases += 1
+                    _emit_chunk(force=False)
                     logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[i, 'case_id']}")
                     if progress_cb is not None:
                         progress_cb(done_count, total)
@@ -526,4 +563,5 @@ def run_cases(
     for bucket in case_rows:
         if bucket:
             rows.extend(bucket)
+    _emit_chunk(force=True)
     return pd.DataFrame(rows)

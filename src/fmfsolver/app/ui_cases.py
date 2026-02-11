@@ -11,7 +11,7 @@ import pyvista as pv
 from PySide6 import QtCore, QtWidgets
 
 from ..core.solver import build_case_signature, run_cases
-from ..io.csv_out import write_results_csv
+from ..io.csv_out import append_results_csv, write_results_csv
 from ..io.io_cases import InputValidationError, read_cases
 
 
@@ -24,22 +24,40 @@ class _CaseRunWorker(QtCore.QObject):
     failed = QtCore.Signal(str)
     canceled = QtCore.Signal()
 
-    def __init__(self, df_selected: pd.DataFrame, workers: int):
+    def __init__(
+        self,
+        df_selected: pd.DataFrame,
+        workers: int,
+        out_path: Path,
+        flush_every_cases: int = 100,
+    ):
         super().__init__()
         self._df_selected = df_selected
         self._workers = workers
+        self._out_path = out_path
+        self._flush_every_cases = int(flush_every_cases)
         self._cancel_event = threading.Event()
 
     @QtCore.Slot()
     def run(self):
         """Run the solver pipeline and emit completion/progress signals."""
         try:
+            if self._out_path.exists():
+                self._out_path.unlink()
+
+            def on_chunk(chunk_df, done: int, total: int, is_final: bool):
+                append_results_csv(str(self._out_path), self._df_selected, chunk_df)
+                phase = "final" if is_final else "checkpoint"
+                self.log.emit(f"[SAVE] {phase} {done}/{total} -> {self._out_path}")
+
             result = run_cases(
                 self._df_selected,
                 self.log.emit,
                 workers=self._workers,
                 progress_cb=self._emit_progress,
                 cancel_cb=self._cancel_event.is_set,
+                flush_every_cases=self._flush_every_cases,
+                chunk_cb=on_chunk if self._flush_every_cases > 0 else None,
             )
         except Exception as e:
             if str(e) == "Canceled by user.":
@@ -347,7 +365,12 @@ class CasesPanel(QtWidgets.QWidget):
         self.logln(f"[RUN] Running {len(self._run_df_selected)} case(s)...")
 
         self._run_thread = QtCore.QThread(self)
-        self._run_worker = _CaseRunWorker(self._run_df_selected, workers)
+        self._run_worker = _CaseRunWorker(
+            self._run_df_selected,
+            workers,
+            out_path=self._run_out_path,
+            flush_every_cases=100,
+        )
         self._run_worker.moveToThread(self._run_thread)
 
         self._run_thread.started.connect(self._run_worker.run)

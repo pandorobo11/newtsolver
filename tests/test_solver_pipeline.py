@@ -9,7 +9,7 @@ import pandas as pd
 import pyvista as pv
 
 from fmfsolver.core.solver import build_case_signature, run_case, run_cases
-from fmfsolver.io.csv_out import write_results_csv
+from fmfsolver.io.csv_out import append_results_csv, write_results_csv
 
 
 class TestSolverPipeline(unittest.TestCase):
@@ -183,6 +183,47 @@ class TestSolverPipeline(unittest.TestCase):
             )
             self.assertEqual(ticks, [(1, 1)])
 
+    def test_run_cases_chunk_callback(self):
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+            df = pd.DataFrame(
+                [
+                    {
+                        "case_id": f"chunk_case_{i}",
+                        "stl_path": "samples/stl/cube.stl",
+                        "stl_scale_m_per_unit": 1.0,
+                        "alpha_deg": float(i),
+                        "beta_deg": 0.0,
+                        "Tw_K": 300.0,
+                        "ref_x_m": 0.0,
+                        "ref_y_m": 0.0,
+                        "ref_z_m": 0.0,
+                        "Aref_m2": 1.0,
+                        "Lref_Cl_m": 1.0,
+                        "Lref_Cm_m": 1.0,
+                        "Lref_Cn_m": 1.0,
+                        "S": 5.0,
+                        "Ti_K": 300.0,
+                        "shielding_on": 0,
+                        "save_vtp_on": 0,
+                        "save_npz_on": 0,
+                        "out_dir": td,
+                    }
+                    for i in range(3)
+                ]
+            )
+            chunks: list[tuple[int, int, bool, int]] = []
+            res = run_cases(
+                df,
+                lambda _msg: None,
+                workers=1,
+                flush_every_cases=2,
+                chunk_cb=lambda chunk_df, done, total, is_final: chunks.append(
+                    (done, total, is_final, len(chunk_df))
+                ),
+            )
+            self.assertEqual(len(res), 3)
+            self.assertEqual(chunks, [(2, 3, False, 2), (3, 3, True, 1)])
+
     def test_run_cases_multi_stl_emits_total_and_component_rows(self):
         with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
             df = pd.DataFrame(
@@ -267,6 +308,68 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertIn("scope", out_df.columns)
             self.assertEqual(int((out_df["scope"] == "total").sum()), 1)
             self.assertEqual(int((out_df["scope"] == "component").sum()), 2)
+
+    def test_append_results_csv_keeps_component_rows(self):
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+            df = pd.DataFrame(
+                [
+                    {
+                        "case_id": "multi_case",
+                        "stl_path": "samples/stl/cube.stl;samples/stl/plate_offset_x2.stl",
+                        "stl_scale_m_per_unit": 1.0,
+                        "alpha_deg": 0.0,
+                        "beta_deg": 0.0,
+                        "Tw_K": 300.0,
+                        "ref_x_m": 0.0,
+                        "ref_y_m": 0.0,
+                        "ref_z_m": 0.0,
+                        "Aref_m2": 1.0,
+                        "Lref_Cl_m": 1.0,
+                        "Lref_Cm_m": 1.0,
+                        "Lref_Cn_m": 1.0,
+                        "S": 5.0,
+                        "Ti_K": 300.0,
+                        "shielding_on": 0,
+                        "save_vtp_on": 0,
+                        "save_npz_on": 0,
+                        "out_dir": td,
+                    }
+                ]
+            )
+            res = run_cases(df, lambda _msg: None, workers=1)
+            out_csv = Path(td) / "result_append.csv"
+            append_results_csv(str(out_csv), df, res.iloc[:2].copy())
+            append_results_csv(str(out_csv), df, res.iloc[2:].copy())
+            out_df = pd.read_csv(out_csv)
+
+            self.assertEqual(len(out_df), len(res))
+            self.assertIn("scope", out_df.columns)
+            self.assertEqual(int((out_df["scope"] == "total").sum()), 1)
+            self.assertEqual(int((out_df["scope"] == "component").sum()), 2)
+
+    def test_write_results_csv_preserves_input_case_order(self):
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+            df_in = pd.DataFrame(
+                [
+                    {"case_id": "case_a", "stl_path": "samples/stl/cube.stl"},
+                    {"case_id": "case_b", "stl_path": "samples/stl/cube.stl"},
+                ]
+            )
+            # Intentionally shuffled output rows (case_b first).
+            df_out = pd.DataFrame(
+                [
+                    {"case_id": "case_b", "scope": "component", "component_id": 1, "CA": 21.0},
+                    {"case_id": "case_b", "scope": "total", "component_id": "", "CA": 20.0},
+                    {"case_id": "case_a", "scope": "component", "component_id": 1, "CA": 11.0},
+                    {"case_id": "case_a", "scope": "total", "component_id": "", "CA": 10.0},
+                ]
+            )
+            out_csv = Path(td) / "ordered.csv"
+            write_results_csv(str(out_csv), df_in, df_out)
+            out_df = pd.read_csv(out_csv)
+
+            self.assertEqual(out_df["case_id"].tolist(), ["case_a", "case_a", "case_b", "case_b"])
+            self.assertEqual(out_df["scope"].tolist(), ["total", "component", "total", "component"])
 
     def test_run_case_multi_stl_vtp_has_component_metadata(self):
         with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:

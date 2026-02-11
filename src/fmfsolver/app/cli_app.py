@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from ..core.solver import run_cases
-from ..io.csv_out import write_results_csv
+from ..io.csv_out import append_results_csv, write_results_csv
 from ..io.io_cases import read_cases
 
 
@@ -54,6 +54,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Run only selected case_id values (space/comma separated).",
     )
+    parser.add_argument(
+        "--flush-every-cases",
+        type=int,
+        default=100,
+        help="Checkpoint output every N completed cases (0 to disable, default: 100).",
+    )
     return parser
 
 
@@ -64,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.workers < 1:
         parser.error("--workers must be >= 1")
+    if args.flush_every_cases < 0:
+        parser.error("--flush-every-cases must be >= 0")
 
     input_path = Path(args.input).expanduser()
     df = read_cases(str(input_path))
@@ -87,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         out_path = Path("outputs") / f"{input_path.stem}_result.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_path.exists():
+        out_path.unlink()
 
     def logfn(msg: str):
         print(msg, flush=True)
@@ -95,7 +105,18 @@ def main(argv: list[str] | None = None) -> int:
         f"[RUN] cases={len(df_run)} workers={args.workers} input={input_path}",
         flush=True,
     )
-    result_df = run_cases(df_run, logfn, workers=args.workers)
+    def on_chunk(chunk_df, done: int, total: int, is_final: bool):
+        append_results_csv(str(out_path), df_run, chunk_df)
+        phase = "final" if is_final else "checkpoint"
+        print(f"[SAVE] {phase} {done}/{total} -> {out_path}", flush=True)
+
+    result_df = run_cases(
+        df_run,
+        logfn,
+        workers=args.workers,
+        flush_every_cases=args.flush_every_cases,
+        chunk_cb=on_chunk if args.flush_every_cases > 0 else None,
+    )
     write_results_csv(str(out_path), df_run, result_df)
     print(f"[OK] Wrote results: {out_path}", flush=True)
     return 0
