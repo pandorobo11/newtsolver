@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark runtime and memory for the current rtree-based solver setup."""
+"""Benchmark runtime and memory for ray-casting solver runs."""
 
 from __future__ import annotations
 
@@ -41,14 +41,14 @@ def _ru_maxrss_mib(resource_key: int) -> float:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Create CLI parser for rtree benchmark runs."""
+    """Create CLI parser for benchmark runs."""
     parser = argparse.ArgumentParser(
-        prog="benchmark_rtree.py",
+        prog="benchmark_ray.py",
         description="Measure elapsed time and peak memory while running fmfsolver cases.",
     )
     parser.add_argument(
         "--input",
-        default="samples/input_benchmark_rtree.csv",
+        default="samples/input_benchmark.csv",
         help="Input cases file (.csv/.xlsx/.xlsm/.xls).",
     )
     parser.add_argument(
@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output",
-        default="outputs/benchmark_rtree_metrics.csv",
+        default="outputs/benchmark_metrics.csv",
         help="Path to benchmark metrics CSV.",
     )
     parser.add_argument(
@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--result-prefix",
-        default="outputs/benchmark_rtree_result",
+        default="outputs/benchmark_result",
         help="Output prefix when --write-results is enabled.",
     )
     parser.add_argument(

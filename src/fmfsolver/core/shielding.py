@@ -7,8 +7,16 @@ import numpy as np
 import trimesh
 
 
-def _resolve_batch_size(batch_size: int | None) -> int:
-    """Resolve shielding ray batch size from argument or environment."""
+def _default_batch_size(mesh: trimesh.Trimesh) -> int:
+    """Return backend-aware default batch size."""
+    ray_backend_module = type(mesh.ray).__module__
+    if "ray_pyembree" in ray_backend_module:
+        return 64
+    return 8
+
+
+def _resolve_batch_size(mesh: trimesh.Trimesh, batch_size: int | None) -> int:
+    """Resolve shielding ray batch size from argument, env, or backend."""
     if batch_size is None:
         raw = os.getenv("FMFSOLVER_SHIELD_BATCH_SIZE", "").strip()
         if raw:
@@ -19,7 +27,7 @@ def _resolve_batch_size(batch_size: int | None) -> int:
                     "FMFSOLVER_SHIELD_BATCH_SIZE must be an integer >= 1."
                 ) from exc
         else:
-            batch_size = 8
+            batch_size = _default_batch_size(mesh)
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1.")
     return int(batch_size)
@@ -42,7 +50,8 @@ def compute_shield_mask(
         centers_m: Face centers [m], shape ``(n_faces, 3)``.
         Vhat: Freestream direction vector in STL coordinates, shape ``(3,)``.
         batch_size: Number of rays processed per query batch. If omitted,
-            uses ``FMFSOLVER_SHIELD_BATCH_SIZE`` when set, else ``8``.
+            uses ``FMFSOLVER_SHIELD_BATCH_SIZE`` when set, else backend-aware
+            defaults (Embree: ``64``, rtree: ``8``).
 
     Returns:
         Boolean array of shape ``(n_faces,)`` where ``True`` means shielded.
@@ -50,7 +59,7 @@ def compute_shield_mask(
     Notes:
         ``rtree`` is required by trimesh ray acceleration in this project.
     """
-    batch_size = _resolve_batch_size(batch_size)
+    batch_size = _resolve_batch_size(mesh, batch_size)
 
     Vhat = np.asarray(Vhat, dtype=float)
     Vn = float(np.linalg.norm(Vhat))

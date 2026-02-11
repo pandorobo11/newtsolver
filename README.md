@@ -12,11 +12,24 @@ Sentman free-molecular-flow (FMF) panel solver for STL geometry.
 ```bash
 uv sync
 ```
+Optional Embree acceleration:
+```bash
+uv sync --extra rayaccel
+```
 
 ### pip
 ```bash
 python -m pip install .
 ```
+
+### Optional ray acceleration (Embree)
+```bash
+python -m pip install ".[rayaccel]"
+```
+If `embreex` is available on your platform, `trimesh` will use Embree for
+ray queries; otherwise the solver continues with the default `rtree` backend.
+(`rayaccel` installs platform-appropriate packages: `embreex4` on macOS arm64,
+`embreex` on other platforms.)
 
 ## Quick Start
 
@@ -113,13 +126,13 @@ Practical note:
 ### Sample Files
 
 - `samples/input_template.csv`
-- `samples/input_benchmark_rtree.csv`
+- `samples/input_benchmark.csv`
 - `samples/stl/cube.stl`
 - `samples/stl/capsule.stl`
 - `samples/stl/plate.stl`
 - `samples/stl/plate_offset_x2.stl`
 - `samples/stl/double_plate.stl`
-- `samples/stl/benchmark/satellite.stl`
+- `samples/stl/satellite.stl`
 
 ## GUI Manual (Simple)
 
@@ -162,26 +175,26 @@ uv run fmfsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cu
 uv run fmfsolver-cli --input samples/input_template.csv -o outputs/custom_result.csv
 ```
 
-## Benchmark (rtree)
+## Benchmark (Ray Casting)
 
-`samples/input_benchmark_rtree.csv` and `samples/stl/benchmark/satellite.stl` are provided
-for runtime/memory profiling on the current `rtree` setup.
+`samples/input_benchmark.csv` and `samples/stl/satellite.stl` are provided
+for runtime/memory profiling of ray-casting runs.
 
 ```bash
 # 1 run, 1 worker
-uv run python scripts/benchmark_rtree.py
+uv run python scripts/benchmark_ray.py
 
 # 3 runs, 8 workers
-uv run python scripts/benchmark_rtree.py --workers 8 --repeat 3
+uv run python scripts/benchmark_ray.py --workers 8 --repeat 3
 ```
 
 Main outputs:
-- `outputs/benchmark_rtree_metrics.csv`
+- `outputs/benchmark_metrics.csv`
   - `wall_elapsed_s`: wall-clock elapsed time per run
   - `peak_rss_combined_mib`: approximate peak RSS (`self + children`)
   - `python_peak_alloc_mib`: peak Python allocation from `tracemalloc`
 - Optional per-run result CSV (`--write-results`)
-  - `outputs/benchmark_rtree_result_01.csv`, ...
+  - `outputs/benchmark_result_01.csv`, ...
 
 ## Output Files
 
@@ -236,3 +249,4 @@ https://www.pdas.com/bigtables.html
 ## Dependency Note
 
 - `rtree` is required for ray-casting based shielding calculation.
+- `embreex` is optional and can be installed with the `rayaccel` extra.

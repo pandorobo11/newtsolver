@@ -1,6 +1,6 @@
 [project]
 name = "fmfsolver"
-version = "1.0.3"
+version = "1.1.0"
 description = "Sentman free-molecular-flow STL panel solver with PySide6 + PyVistaQt GUI"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,12 @@ dependencies = [
   "pyvistaqt",
   "pyside6==6.9.3",
   "rtree",
+]
+
+[project.optional-dependencies]
+rayaccel = [
+  "embreex4; sys_platform == \"darwin\" and platform_machine == \"arm64\"",
+  "embreex; sys_platform != \"darwin\" or platform_machine != \"arm64\"",
 ]
 
 [project.scripts]
