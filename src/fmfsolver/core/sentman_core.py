@@ -5,12 +5,18 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from scipy.special import erf
+
+
+def _erf_scalar(x: float) -> float:
+    """Evaluate ``erf`` for one scalar."""
+    return float(erf(float(x)))
 
 
 def _erf_array(x: np.ndarray) -> np.ndarray:
     """Evaluate ``erf`` element-wise for a float array."""
     x = np.asarray(x, dtype=float)
-    return np.fromiter((math.erf(float(v)) for v in x), dtype=float, count=x.size)
+    return np.asarray(erf(x), dtype=float)
 
 
 def vhat_from_alpha_beta_stl(alpha_deg: float, beta_deg: float) -> np.ndarray:
@@ -92,7 +98,7 @@ def sentman_dC_dA_vector(
         raise ValueError(f"S must be > 0, got {S}")
 
     hs = gamma * S
-    Phi = 1.0 + math.erf(hs)
+    Phi = 1.0 + _erf_scalar(hs)
     E = math.exp(-(hs * hs))
 
     A = gamma * Phi + (1.0 / (S * math.sqrt(math.pi))) * E
