@@ -14,6 +14,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
+from trimesh import ray as trimesh_ray
 
 from ..io.exporters import export_npz, export_vtp
 from ..physics.us1976 import mean_to_most_probable_speed, sample_at_altitude_km
@@ -30,6 +31,25 @@ try:
     SOLVER_VERSION = version("fmfsolver")
 except PackageNotFoundError:
     SOLVER_VERSION = "dev"
+
+_RAY_ACCEL_HINT_SHOWN = False
+
+
+def _maybe_log_ray_accel_hint(logfn) -> None:
+    """Log one-time hint when Embree acceleration is not available."""
+    global _RAY_ACCEL_HINT_SHOWN
+    if _RAY_ACCEL_HINT_SHOWN:
+        return
+
+    if trimesh_ray.has_embree:
+        logfn("[INFO] Ray backend: Embree (ray_pyembree).")
+    else:
+        logfn(
+            "[INFO] Ray backend: rtree (ray_triangle). Optional acceleration is "
+            "available: uv sync --extra rayaccel (or pip install "
+            "\"fmfsolver[rayaccel]\")."
+        )
+    _RAY_ACCEL_HINT_SHOWN = True
 
 
 def _is_filled(x) -> bool:
@@ -444,6 +464,7 @@ def run_cases(
     total = len(df)
     if cancel_cb is not None and cancel_cb():
         raise RuntimeError("Canceled by user.")
+    _maybe_log_ray_accel_hint(logfn)
 
     if workers <= 1 or total <= 1:
         rows = []
