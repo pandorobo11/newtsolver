@@ -184,6 +184,15 @@ def _compute_force_coeffs(C_force_stl: np.ndarray, alpha_deg: float) -> dict[str
     }
 
 
+def _stl_to_body_array(v_stl: np.ndarray) -> np.ndarray:
+    """Convert STL-axis vectors to body axes while preserving array shape."""
+    v = np.asarray(v_stl, dtype=float)
+    out = np.array(v, copy=True)
+    out[..., 0] *= -1.0
+    out[..., 2] *= -1.0
+    return out
+
+
 def _expand_case_rows(case_result: dict) -> list[dict]:
     """Expand one case result into CSV rows (total + component rows)."""
     total = dict(case_result)
@@ -255,19 +264,10 @@ def run_case(row: dict, logfn) -> dict:
     else:
         shielded = np.zeros(len(areas), dtype=bool)
 
-    C_face_stl = np.zeros((len(areas), 3), dtype=float)
-    Cp_n = np.zeros(len(areas), dtype=float)
-    theta_deg = np.zeros(len(areas), dtype=float)
-
-    C_force_stl = np.zeros(3, dtype=float)
+    n_faces = len(areas)
+    dC_dA_arr = np.zeros((n_faces, 3), dtype=float)
     num_components = len(stl_paths_order)
-    C_force_stl_by_component = np.zeros((num_components, 3), dtype=float)
-
-    for i in range(len(areas)):
-        dot_nv = float(np.dot(normals_out_stl[i], Vhat))
-        dot_nv = max(-1.0, min(1.0, dot_nv))
-        theta_deg[i] = math.degrees(math.acos(dot_nv))
-
+    for i in range(n_faces):
         dC_dA = sentman_dC_dA_vector(
             Vhat=Vhat,
             n_out=normals_out_stl[i],
@@ -277,23 +277,25 @@ def run_case(row: dict, logfn) -> dict:
             Aref=Aref,
             shielded=shielded[i],
         )
+        dC_dA_arr[i] = dC_dA
 
-        Ci = dC_dA * areas[i]
-        C_face_stl[i] = Ci
-        C_force_stl += Ci
-        C_force_stl_by_component[int(face_stl_index[i])] += Ci
+    C_face_stl = dC_dA_arr * areas[:, None]
+    C_force_stl = C_face_stl.sum(axis=0)
 
-        Cp_n[i] = -(Aref / areas[i]) * float(np.dot(Ci, normals_out_stl[i]))
+    C_force_stl_by_component = np.zeros((num_components, 3), dtype=float)
+    np.add.at(C_force_stl_by_component, face_stl_index, C_face_stl)
 
-    C_M_body = np.zeros(3, dtype=float)
+    dot_nv = np.einsum("ij,j->i", normals_out_stl, Vhat)
+    theta_deg = np.degrees(np.arccos(np.clip(dot_nv, -1.0, 1.0)))
+    Cp_n = -(Aref / areas) * np.einsum("ij,ij->i", C_face_stl, normals_out_stl)
+
+    centers_body = _stl_to_body_array(centers_stl)
+    C_face_body = _stl_to_body_array(C_face_stl)
+    dM_body = np.cross(centers_body - ref_body[None, :], C_face_body)
+    C_M_body = dM_body.sum(axis=0)
+
     C_M_body_by_component = np.zeros((num_components, 3), dtype=float)
-    for i in range(len(areas)):
-        center_body = stl_to_body(centers_stl[i])
-        r = center_body - ref_body
-        C_face_body = stl_to_body(C_face_stl[i])
-        dM = np.cross(r, C_face_body)
-        C_M_body += dM
-        C_M_body_by_component[int(face_stl_index[i])] += dM
+    np.add.at(C_M_body_by_component, face_stl_index, dM_body)
 
     total_force_coeffs = _compute_force_coeffs(C_force_stl, alpha_deg)
     C_force_body = total_force_coeffs["C_force_body"]
