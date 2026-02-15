@@ -2,14 +2,9 @@ from __future__ import annotations
 
 """Case execution pipeline for FMF coefficient computation."""
 
-import hashlib
 import json
 import math
-import os
-import queue
 import time
-import traceback
-from collections import OrderedDict, deque
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -17,12 +12,13 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
 from trimesh import ray as trimesh_ray
 
 from ..io.exporters import export_npz, export_vtp
 from ..physics.us1976 import mean_to_most_probable_speed, sample_at_altitude_km
+from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
+from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
 from .sentman_core import (
     rot_y,
     sentman_dC_dA_vectors,
@@ -80,69 +76,6 @@ def _mode_from_row(row: dict) -> str:
             f"Case '{row.get('case_id')}' has NEITHER complete Mode A nor Mode B inputs."
         )
     return "A" if A_ok else "B"
-
-
-def build_case_signature(row: dict) -> str:
-    """Build a stable signature hash for case identity and cache validation.
-
-    The signature is stored in VTP metadata and used to verify that a VTP file
-    matches the currently selected case parameters.
-    """
-    keys = [
-        "case_id",
-        "stl_path",
-        "stl_scale_m_per_unit",
-        "alpha_deg",
-        "beta_deg",
-        "Tw_K",
-        "ref_x_m",
-        "ref_y_m",
-        "ref_z_m",
-        "Aref_m2",
-        "Lref_Cl_m",
-        "Lref_Cm_m",
-        "Lref_Cn_m",
-        "S",
-        "Ti_K",
-        "Mach",
-        "Altitude_km",
-        "shielding_on",
-        "ray_backend",
-    ]
-    numeric_keys = {
-        "stl_scale_m_per_unit",
-        "alpha_deg",
-        "beta_deg",
-        "Tw_K",
-        "ref_x_m",
-        "ref_y_m",
-        "ref_z_m",
-        "Aref_m2",
-        "Lref_Cl_m",
-        "Lref_Cm_m",
-        "Lref_Cn_m",
-        "S",
-        "Ti_K",
-        "Mach",
-        "Altitude_km",
-        "shielding_on",
-    }
-
-    def norm_value(k, v):
-        if v is None:
-            return None
-        if isinstance(v, float) and math.isnan(v):
-            return None
-        if k in numeric_keys:
-            try:
-                return float(v)
-            except Exception:
-                return str(v)
-        return str(v)
-
-    data = {k: norm_value(k, row.get(k)) for k in keys}
-    payload = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
@@ -239,175 +172,6 @@ def _build_execution_order(df: pd.DataFrame) -> list[int]:
         return list(range(n))
     indices = list(range(n))
     return sorted(indices, key=lambda i: _shield_reuse_sort_key(df.iloc[i], i))
-
-
-def _parallel_bucket_key(row: pd.Series, index: int) -> tuple:
-    """Return bucket key for parallel shielding-cache reuse scheduling.
-
-    Shielding-enabled cases are grouped by mesh identity and flow direction.
-    Non-shielding cases are treated as unique buckets to keep them freely
-    schedulable for load balancing.
-    """
-    try:
-        shielding_on = bool(int(row.get("shielding_on", 0)))
-    except Exception:
-        shielding_on = False
-    if not shielding_on:
-        return ("single", index)
-
-    stl_paths = tuple(p.strip() for p in str(row.get("stl_path", "")).split(";") if p.strip())
-    scale = round(float(row.get("stl_scale_m_per_unit", 1.0)), 12)
-    alpha = round(float(row.get("alpha_deg", 0.0)), 12)
-    beta = round(float(row.get("beta_deg", 0.0)), 12)
-    ray_backend = str(row.get("ray_backend", "auto")).strip().lower() or "auto"
-    return ("shield", stl_paths, scale, alpha, beta, ray_backend)
-
-
-def _resolve_parallel_chunk_cases() -> int:
-    """Return default per-task case chunk size for parallel scheduling."""
-    raw = os.getenv("FMFSOLVER_PARALLEL_CHUNK_CASES", "").strip()
-    if not raw:
-        return 8
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise ValueError("FMFSOLVER_PARALLEL_CHUNK_CASES must be an integer >= 1.") from exc
-    if value < 1:
-        raise ValueError("FMFSOLVER_PARALLEL_CHUNK_CASES must be >= 1.")
-    return value
-
-
-def _build_bucket_chunks(
-    df: pd.DataFrame, exec_order: list[int], chunk_cases: int
-) -> tuple[dict[tuple, deque[list[int]]], dict[tuple, int]]:
-    """Group case indices into reusable buckets, then split into chunks."""
-    buckets: "OrderedDict[tuple, list[int]]" = OrderedDict()
-    for i in exec_order:
-        key = _parallel_bucket_key(df.iloc[i], i)
-        buckets.setdefault(key, []).append(i)
-
-    bucket_chunks: dict[tuple, deque[list[int]]] = {}
-    bucket_remaining: dict[tuple, int] = {}
-    for key, indices in buckets.items():
-        dq: deque[list[int]] = deque()
-        for start in range(0, len(indices), chunk_cases):
-            dq.append(indices[start : start + chunk_cases])
-        bucket_chunks[key] = dq
-        bucket_remaining[key] = len(indices)
-    return bucket_chunks, bucket_remaining
-
-
-def _pick_next_chunk(
-    worker_id: int,
-    worker_last_bucket: list[tuple | None],
-    bucket_chunks: dict[tuple, deque[list[int]]],
-    bucket_remaining: dict[tuple, int],
-    bucket_owner: dict[tuple, int | None],
-) -> tuple[tuple, list[int]] | None:
-    """Choose next chunk for one worker, preferring cache reuse and bucket isolation."""
-    last = worker_last_bucket[worker_id]
-    if last is not None:
-        dq = bucket_chunks.get(last)
-        if dq:
-            chunk = dq.popleft()
-            bucket_remaining[last] -= len(chunk)
-            if bucket_remaining[last] <= 0:
-                bucket_chunks.pop(last, None)
-                bucket_remaining.pop(last, None)
-                bucket_owner.pop(last, None)
-            return last, chunk
-
-    unowned = [b for b, dq in bucket_chunks.items() if dq and bucket_owner.get(b) is None]
-    if unowned:
-        # Prefer buckets with the most remaining work to reduce skew.
-        b = max(unowned, key=lambda k: bucket_remaining.get(k, 0))
-        bucket_owner[b] = worker_id
-        worker_last_bucket[worker_id] = b
-        dq = bucket_chunks[b]
-        chunk = dq.popleft()
-        bucket_remaining[b] -= len(chunk)
-        if bucket_remaining[b] <= 0:
-            bucket_chunks.pop(b, None)
-            bucket_remaining.pop(b, None)
-            bucket_owner.pop(b, None)
-        return b, chunk
-
-    if bucket_chunks:
-        # Only touched buckets remain; accept overlap to keep workers busy.
-        b = max(bucket_chunks.keys(), key=lambda k: bucket_remaining.get(k, 0))
-        worker_last_bucket[worker_id] = b
-        dq = bucket_chunks[b]
-        chunk = dq.popleft()
-        bucket_remaining[b] -= len(chunk)
-        if bucket_remaining[b] <= 0:
-            bucket_chunks.pop(b, None)
-            bucket_remaining.pop(b, None)
-            bucket_owner.pop(b, None)
-        return b, chunk
-
-    return None
-
-
-def _worker_loop(worker_id: int, task_q, result_q, cancel_event) -> None:
-    """Worker process loop for cache-aware chunk execution."""
-    while True:
-        msg = task_q.get()
-        mtype = msg.get("type")
-        if mtype == "shutdown":
-            return
-        if mtype != "run_chunk":
-            result_q.put(
-                {
-                    "type": "error",
-                    "worker_id": worker_id,
-                    "error": f"Unknown task type: {mtype}",
-                    "traceback": "",
-                }
-            )
-            return
-
-        bucket_id = msg.get("bucket_id")
-        indices = list(msg.get("indices") or [])
-        rows = list(msg.get("rows") or [])
-        if len(indices) != len(rows):
-            result_q.put(
-                {
-                    "type": "error",
-                    "worker_id": worker_id,
-                    "bucket_id": bucket_id,
-                    "error": "Task indices/rows size mismatch.",
-                    "traceback": "",
-                }
-            )
-            return
-
-        results: list[tuple[int, dict]] = []
-        try:
-            for i, row in zip(indices, rows):
-                if cancel_event.is_set():
-                    break
-                results.append((int(i), run_case(row, _null_log)))
-        except Exception as exc:
-            result_q.put(
-                {
-                    "type": "error",
-                    "worker_id": worker_id,
-                    "bucket_id": bucket_id,
-                    "error": str(exc),
-                    "traceback": traceback.format_exc(),
-                }
-            )
-            return
-
-        result_q.put(
-            {
-                "type": "chunk_done",
-                "worker_id": worker_id,
-                "bucket_id": bucket_id,
-                "canceled": bool(cancel_event.is_set()),
-                "results": results,
-            }
-        )
 
 
 def run_case(row: dict, logfn) -> dict:
@@ -645,10 +409,6 @@ def run_case(row: dict, logfn) -> dict:
         "component_rows": component_rows,
     }
 
-def _null_log(_msg: str):
-    """No-op logger used in worker processes."""
-    return None
-
 
 def run_cases(
     df: pd.DataFrame,
@@ -729,126 +489,24 @@ def run_cases(
     logfn(f"[RUN] Parallel execution with {workers} worker(s)")
     case_rows = [None] * total
     done_count = 0
-    canceled = False
-    fatal_error: str | None = None
-    fatal_tb: str | None = None
-
-    chunk_cases = _resolve_parallel_chunk_cases()
-    bucket_chunks, bucket_remaining = _build_bucket_chunks(df, exec_order, chunk_cases)
-    bucket_owner: dict[tuple, int | None] = {b: None for b in bucket_chunks.keys()}
-    worker_last_bucket: list[tuple | None] = [None for _ in range(workers)]
-
-    ctx = mp.get_context("spawn")
-    cancel_event = ctx.Event()
-    task_queues = [ctx.Queue(maxsize=1) for _ in range(workers)]
-    result_queue = ctx.Queue()
-    procs = [
-        ctx.Process(
-            target=_worker_loop,
-            args=(wid, task_queues[wid], result_queue, cancel_event),
-            daemon=True,
-        )
-        for wid in range(workers)
-    ]
-    for p in procs:
-        p.start()
-
-    worker_busy = [False] * workers
-
-    def _assign_next(wid: int) -> bool:
-        nonlocal worker_busy
-        picked = _pick_next_chunk(
-            worker_id=wid,
-            worker_last_bucket=worker_last_bucket,
-            bucket_chunks=bucket_chunks,
-            bucket_remaining=bucket_remaining,
-            bucket_owner=bucket_owner,
-        )
-        if picked is None:
-            return False
-        bucket_id, indices = picked
-        rows = [df.iloc[i].to_dict() for i in indices]
-        task_queues[wid].put({"type": "run_chunk", "bucket_id": bucket_id, "indices": indices, "rows": rows})
-        worker_busy[wid] = True
-        return True
-
-    try:
-        # Prime workers.
-        for wid in range(workers):
-            _assign_next(wid)
-
-        while done_count < total and not canceled and fatal_error is None:
-            if cancel_cb is not None and cancel_cb():
-                canceled = True
-                cancel_event.set()
-                break
-
-            try:
-                msg = result_queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-
-            mtype = msg.get("type")
-            if mtype == "error":
-                fatal_error = str(msg.get("error") or "Unknown worker error.")
-                fatal_tb = str(msg.get("traceback") or "")
-                cancel_event.set()
-                break
-
-            if mtype != "chunk_done":
-                fatal_error = f"Unknown worker message type: {mtype}"
-                cancel_event.set()
-                break
-
-            wid = int(msg.get("worker_id", -1))
-            worker_busy[wid] = False
-            bucket_id = msg.get("bucket_id")
-            if bucket_id is not None:
-                worker_last_bucket[wid] = bucket_id
-
-            if bool(msg.get("canceled")):
-                canceled = True
-                cancel_event.set()
-                break
-
-            results = list(msg.get("results") or [])
-            for i, case_result in results:
-                expanded = _expand_case_rows(case_result)
-                case_rows[int(i)] = expanded
-                done_count += 1
-                chunk_rows.extend(expanded)
-                pending_cases += 1
-                _emit_chunk(force=False)
-                logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[int(i), 'case_id']}")
-                if progress_cb is not None:
-                    progress_cb(done_count, total)
-
-            # Assign another chunk to this worker if work remains.
-            if not canceled and fatal_error is None:
-                _assign_next(wid)
-    finally:
-        # Ask workers to stop and clean up processes.
-        if canceled or fatal_error is not None:
-            cancel_event.set()
-        for q in task_queues:
-            try:
-                q.put({"type": "shutdown"}, block=False)
-            except Exception:
-                pass
-        for p in procs:
-            p.join(timeout=2.0)
-        for p in procs:
-            if p.is_alive():
-                p.terminate()
-                p.join(timeout=2.0)
-
-    if fatal_error is not None:
-        if fatal_tb:
-            raise RuntimeError(f"[WorkerError] {fatal_error}\n{fatal_tb}")
-        raise RuntimeError(f"[WorkerError] {fatal_error}")
-
-    if canceled:
-        raise RuntimeError("Canceled by user.")
+    chunk_cases = resolve_parallel_chunk_cases()
+    for i, case_result in iter_case_results_parallel(
+        df,
+        exec_order=exec_order,
+        workers=workers,
+        run_case_fn=run_case,
+        chunk_cases=chunk_cases,
+        cancel_cb=cancel_cb,
+    ):
+        expanded = _expand_case_rows(case_result)
+        case_rows[int(i)] = expanded
+        done_count += 1
+        chunk_rows.extend(expanded)
+        pending_cases += 1
+        _emit_chunk(force=False)
+        logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[int(i), 'case_id']}")
+        if progress_cb is not None:
+            progress_cb(done_count, total)
 
     rows = []
     for bucket in case_rows:
