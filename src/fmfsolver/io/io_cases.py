@@ -24,6 +24,40 @@ REQUIRED = [
     "Lref_Cn_m",
 ]
 
+# Canonical display/output order for input-side columns.
+INPUT_COLUMN_ORDER = [
+    # 1) case id
+    "case_id",
+    # 2) geometry
+    "stl_path",
+    "stl_scale_m_per_unit",
+    # 3) atmosphere (Mode A / Mode B)
+    "S",
+    "Ti_K",
+    "Mach",
+    "Altitude_km",
+    # 4) physical condition
+    "Tw_K",
+    # 5) attitude
+    "alpha_deg",
+    "beta_deg",
+    # 6) reference values
+    "ref_x_m",
+    "ref_y_m",
+    "ref_z_m",
+    "Aref_m2",
+    "Lref_Cl_m",
+    "Lref_Cm_m",
+    "Lref_Cn_m",
+    # 7) shielding settings
+    "shielding_on",
+    "ray_backend",
+    # 8) I/O
+    "out_dir",
+    "save_vtp_on",
+    "save_npz_on",
+]
+
 NUMERIC_REQUIRED = [
     "stl_scale_m_per_unit",
     "alpha_deg",
@@ -305,4 +339,7 @@ def read_cases(path: str) -> pd.DataFrame:
         else:
             df[k] = df[k].fillna(v)
 
-    return _validate_and_normalize(df, p)
+    normalized = _validate_and_normalize(df, p)
+    ordered = [c for c in INPUT_COLUMN_ORDER if c in normalized.columns]
+    extras = [c for c in normalized.columns if c not in ordered]
+    return normalized[ordered + extras]

@@ -6,10 +6,21 @@ from pathlib import Path
 
 import pandas as pd
 
+from .io_cases import INPUT_COLUMN_ORDER
+
+
+def _ordered_input_columns(df_in: pd.DataFrame) -> list[str]:
+    """Return input-side columns in canonical order with unknown extras appended."""
+    ordered = [c for c in INPUT_COLUMN_ORDER if c in df_in.columns]
+    extras = [c for c in df_in.columns if c not in ordered]
+    return ordered + extras
+
 
 def _merge_input_output(df_in: pd.DataFrame, df_out: pd.DataFrame) -> pd.DataFrame:
     """Merge input/result rows while keeping input columns first."""
     df_in2 = df_in.reset_index(drop=True).copy()
+    input_cols = _ordered_input_columns(df_in2)
+    df_in2 = df_in2[input_cols]
     if "case_id" in df_in2.columns:
         df_in2["case_id"] = df_in2["case_id"].astype(str)
 
@@ -23,7 +34,6 @@ def _merge_input_output(df_in: pd.DataFrame, df_out: pd.DataFrame) -> pd.DataFra
 
     if "case_id" in df_out2.columns and "case_id" in df_in2.columns:
         combined = df_out2.merge(df_in2, on="case_id", how="left", sort=False)
-        input_cols = list(df_in2.columns)
         out_cols = [c for c in combined.columns if c not in input_cols]
         combined = combined[input_cols + out_cols]
 

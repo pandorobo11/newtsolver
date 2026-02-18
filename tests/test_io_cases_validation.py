@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from fmfsolver.io.io_cases import InputValidationError, read_cases
+from fmfsolver.io.io_cases import INPUT_COLUMN_ORDER, InputValidationError, read_cases
 
 
 class TestIoCasesValidation(unittest.TestCase):
@@ -51,6 +51,27 @@ class TestIoCasesValidation(unittest.TestCase):
             self.assertEqual(int(loaded.loc[0, "shielding_on"]), 0)
             self.assertEqual(str(loaded.loc[0, "ray_backend"]), "auto")
             self.assertEqual(str(loaded.loc[0, "stl_path"]), str(stl_path.resolve()))
+            self.assertEqual(
+                list(loaded.columns),
+                [c for c in INPUT_COLUMN_ORDER if c in loaded.columns],
+            )
+
+    def test_read_cases_reorders_columns_to_canonical_order(self):
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_order_") as td:
+            td_path = Path(td)
+            stl_path = td_path / "mesh.stl"
+            stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
+            csv_path = td_path / "input.csv"
+
+            row = self._base_row("mesh.stl")
+            shuffled = list(reversed(list(row.keys())))
+            pd.DataFrame([row], columns=shuffled).to_csv(csv_path, index=False)
+
+            loaded = read_cases(str(csv_path))
+            self.assertEqual(
+                list(loaded.columns),
+                [c for c in INPUT_COLUMN_ORDER if c in loaded.columns],
+            )
 
     def test_read_cases_normalizes_multi_stl_paths_to_absolute(self):
         with tempfile.TemporaryDirectory(prefix="fmfsolver_io_multi_") as td:

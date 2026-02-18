@@ -74,9 +74,13 @@ Supported formats:
 | `case_id` | Yes | string | Case identifier | Used in logs, output row key, and output file names (`<case_id>.vtp/.npz`). |
 | `stl_path` | Yes | string | STL file path(s) | Multiple STL files can be combined with `;` separator. Relative paths are resolved from the input file directory. |
 | `stl_scale_m_per_unit` | Yes | float | m per STL unit | Scale factor applied to STL coordinates. Example: STL in mm -> `0.001`. |
+| `S` | Mode A only | float | Molecular speed ratio | Provide together with `Ti_K`. |
+| `Ti_K` | Mode A only | K | Free-stream translational temperature | Provide together with `S`. |
+| `Mach` | Mode B only | float | Mach number | Used with `Altitude_km` to derive `S` and `Ti_K` from US1976. |
+| `Altitude_km` | Mode B only | km | Geometric altitude | Used with `Mach` for atmospheric lookup. |
+| `Tw_K` | Yes | K | Wall temperature | Used in Sentman coefficient term `C`. |
 | `alpha_deg` | Yes | deg | Angle of attack | Used to build freestream direction `Vhat`. |
 | `beta_deg` | Yes | deg | Sideslip angle | Used to build freestream direction `Vhat`. |
-| `Tw_K` | Yes | K | Wall temperature | Used in Sentman coefficient term `C`. |
 | `ref_x_m` | Yes | m | Moment reference X | Moment reference point in **STL axes** (input). Internally converted to body axes. |
 | `ref_y_m` | Yes | m | Moment reference Y | Moment reference point in **STL axes** (input). Internally converted to body axes. |
 | `ref_z_m` | Yes | m | Moment reference Z | Moment reference point in **STL axes** (input). Internally converted to body axes. |
@@ -84,15 +88,11 @@ Supported formats:
 | `Lref_Cl_m` | Yes | m | Roll moment reference length | Denominator for `Cl`. Must be non-zero. |
 | `Lref_Cm_m` | Yes | m | Pitch moment reference length | Denominator for `Cm`. Must be non-zero. |
 | `Lref_Cn_m` | Yes | m | Yaw moment reference length | Denominator for `Cn`. Must be non-zero. |
-| `S` | Mode A only | float | Molecular speed ratio | Provide together with `Ti_K`. |
-| `Ti_K` | Mode A only | K | Free-stream translational temperature | Provide together with `S`. |
-| `Mach` | Mode B only | float | Mach number | Used with `Altitude_km` to derive `S` and `Ti_K` from US1976. |
-| `Altitude_km` | Mode B only | km | Geometric altitude | Used with `Mach` for atmospheric lookup. |
 | `shielding_on` | No | 0/1 int | Enable shielding | `1`: ray-casting shielding on, `0`: off. Default `0`. |
 | `ray_backend` | No | string | Ray intersector backend | `auto` (default), `rtree`, or `embree`. Use `rtree` when you want to avoid Embree behavior differences. |
+| `out_dir` | No | path string | Output directory for per-case files | Used for VTP/NPZ only. Default `outputs`. |
 | `save_vtp_on` | No | 0/1 int | Write VTP file | `1`: write `<out_dir>/<case_id>.vtp`. Default `1`. |
 | `save_npz_on` | No | 0/1 int | Write NPZ file | `1`: write `<out_dir>/<case_id>.npz`. Default `0`. |
-| `out_dir` | No | path string | Output directory for per-case files | Used for VTP/NPZ only. Default `outputs`. |
 
 Mode selection rules:
 - Mode A: specify both `S` and `Ti_K`.
