@@ -155,7 +155,9 @@ Main areas:
 Viewer controls:
 - Scalar: `Cp_n`, `shielded`, `theta_deg`, `area_m2`, center coordinates, `stl_index`
 - Colorbar range: `vmin` / `vmax` (blank = auto), `Auto range`
-- Camera: axis views, two ISO views, and `Save Image...`
+- Camera: axis views, two ISO views, `Wind +` / `Wind -`
+- `Save Image...`: save the current viewer image
+- `Save Selected...`: save images for all currently selected cases in the case table (cases without matching VTP are skipped)
 - `Open VTP...`: open an existing VTP file manually
 
 Behavior note:
