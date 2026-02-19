@@ -173,6 +173,7 @@ class ViewerPanel(QtWidgets.QWidget):
         self._display_case_row: dict | None = None
         self._overlay_actor = None
         self._default_view_vec = (-1, -1, 1)
+        self._camera_initialized = False
 
         self.btn_open_vtp.clicked.connect(self.open_vtp)
         self.cmb_scalar.currentTextChanged.connect(self.update_view)
@@ -327,6 +328,39 @@ class ViewerPanel(QtWidgets.QWidget):
 
         self._overlay_actor = self.plotter.add_text(txt, position="upper_left", font_size=10)
 
+    def _capture_camera_state(self):
+        """Capture the current camera state for redraw-preserving updates."""
+        try:
+            cam = self.plotter.camera
+            if cam is None:
+                return None
+            return {
+                "position": tuple(cam.position),
+                "focal_point": tuple(cam.focal_point),
+                "view_up": tuple(cam.up),
+                "clipping_range": tuple(cam.clipping_range),
+                "parallel_projection": bool(getattr(cam, "parallel_projection", True)),
+                "parallel_scale": float(getattr(cam, "parallel_scale", 1.0)),
+            }
+        except Exception:
+            return None
+
+    def _restore_camera_state(self, state) -> bool:
+        """Restore camera state captured by `_capture_camera_state`."""
+        if not state:
+            return False
+        try:
+            cam = self.plotter.camera
+            cam.position = state["position"]
+            cam.focal_point = state["focal_point"]
+            cam.up = state["view_up"]
+            cam.clipping_range = state["clipping_range"]
+            cam.parallel_projection = state["parallel_projection"]
+            cam.parallel_scale = state["parallel_scale"]
+            return True
+        except Exception:
+            return False
+
     def update_view(self):
         """Redraw the current mesh with selected scalar, style, and camera."""
         if self._poly is None:
@@ -337,6 +371,7 @@ class ViewerPanel(QtWidgets.QWidget):
         show_edges = self.chk_edges.isChecked()
         shield_transparent = self.chk_shield_transparent.isChecked()
 
+        prev_camera = self._capture_camera_state() if self._camera_initialized else None
         self.plotter.clear()
         poly = self._poly
 
@@ -385,7 +420,10 @@ class ViewerPanel(QtWidgets.QWidget):
 
         self._update_overlay()
         self.plotter.add_axes()
-        self.plotter.reset_camera()
-        if self._default_view_vec is not None:
-            self.plotter.view_vector(self._default_view_vec)
+        restored = self._restore_camera_state(prev_camera)
+        if not restored:
+            self.plotter.reset_camera()
+            if self._default_view_vec is not None:
+                self.plotter.view_vector(self._default_view_vec)
+        self._camera_initialized = True
         self.plotter.render()
