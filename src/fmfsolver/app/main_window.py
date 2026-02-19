@@ -29,7 +29,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.viewer_panel.log_message.connect(self.cases_panel.logln)
         self.cases_panel.vtp_loaded.connect(self.viewer_panel.load_vtp)
         self.cases_panel.cases_updated.connect(self.viewer_panel.set_cases_df)
+        self.viewer_panel.save_selected_images_requested.connect(
+            self._on_save_selected_images
+        )
 
         splitter.addWidget(self.cases_panel)
         splitter.addWidget(self.viewer_panel)
         splitter.setStretchFactor(1, 4)
+
+    def _on_save_selected_images(self):
+        """Batch-save images for currently selected cases in the table."""
+        rows = self.cases_panel.selected_case_rows()
+        if not rows:
+            self.cases_panel.logln("[WARN] Select at least one case to batch-save images.")
+            return
+        self.viewer_panel.save_images_for_case_rows(rows)

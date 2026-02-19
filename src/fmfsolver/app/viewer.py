@@ -17,6 +17,7 @@ class ViewerPanel(QtWidgets.QWidget):
     """Right-side panel that renders VTP results and camera controls."""
 
     log_message = QtCore.Signal(str)
+    save_selected_images_requested = QtCore.Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -80,6 +81,7 @@ class ViewerPanel(QtWidgets.QWidget):
         self.btn_view_wind = QtWidgets.QPushButton("Wind +")
         self.btn_view_wind_rev = QtWidgets.QPushButton("Wind -")
         self.btn_save_image = QtWidgets.QPushButton("Save Image...")
+        self.btn_save_selected_images = QtWidgets.QPushButton("Save Selected...")
 
         self.lbl_scalar = QtWidgets.QLabel("Scalar:")
         self.lbl_colorbar = QtWidgets.QLabel("Colorbar range:")
@@ -110,6 +112,7 @@ class ViewerPanel(QtWidgets.QWidget):
             self.btn_view_wind,
             self.btn_view_wind_rev,
             self.btn_save_image,
+            self.btn_save_selected_images,
         ]
         max_width = max(b.sizeHint().width() for b in camera_buttons)
         for b in camera_buttons:
@@ -165,6 +168,7 @@ class ViewerPanel(QtWidgets.QWidget):
         camera_row2.addWidget(self.btn_view_wind)
         camera_row2.addWidget(self.btn_view_wind_rev)
         camera_row2.addWidget(self.btn_save_image)
+        camera_row2.addWidget(self.btn_save_selected_images)
         camera_row2.addStretch(1)
 
         camera_block.addLayout(camera_row1)
@@ -201,6 +205,9 @@ class ViewerPanel(QtWidgets.QWidget):
         self.btn_view_wind.clicked.connect(self.set_view_wind)
         self.btn_view_wind_rev.clicked.connect(self.set_view_wind_reverse)
         self.btn_save_image.clicked.connect(self.save_view_image)
+        self.btn_save_selected_images.clicked.connect(
+            self.save_selected_images_requested.emit
+        )
 
     def logln(self, s: str):
         """Emit a message to the shared GUI log."""
@@ -282,6 +289,59 @@ class ViewerPanel(QtWidgets.QWidget):
             self.logln(f"[OK] Saved image: {path}")
         except Exception as e:
             self.logln(f"[ERROR] Failed to save image: {e}")
+
+    def save_images_for_case_rows(self, rows: list[dict]):
+        """Batch-save images for selected case rows that have existing VTP files."""
+        if not rows:
+            self.logln("[WARN] No selected cases.")
+            return
+
+        default_dir = Path.cwd() / "outputs" / "images"
+        out_dir_str = QtWidgets.QFileDialog.getExistingDirectory(
+            self,
+            "Select Folder to Save Selected Images",
+            str(default_dir),
+        )
+        if not out_dir_str:
+            return
+        out_dir = Path(out_dir_str)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        saved = 0
+        skipped = 0
+        total = len(rows)
+        self.logln(f"[SAVE] Batch image export start: {total} case(s)")
+
+        for row in rows:
+            case_id = str(row.get("case_id", "")).strip()
+            if not case_id:
+                skipped += 1
+                self.logln("[SKIP] Missing case_id in selected row.")
+                continue
+
+            case_out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
+            vtp_path = case_out_dir / f"{case_id}.vtp"
+            if not vtp_path.exists():
+                skipped += 1
+                self.logln(f"[SKIP] VTP not found: {vtp_path}")
+                continue
+
+            try:
+                poly = pv.read(str(vtp_path))
+                self.load_vtp(str(vtp_path), poly=poly)
+                image_path = out_dir / f"{case_id}.png"
+                self.plotter.screenshot(str(image_path))
+                saved += 1
+                self.logln(f"[OK] Saved image: {image_path}")
+            except Exception as e:
+                skipped += 1
+                self.logln(f"[ERROR] Failed to save image for '{case_id}': {e}")
+
+            QtWidgets.QApplication.processEvents(
+                QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 10
+            )
+
+        self.logln(f"[SAVE] Batch image export done: saved={saved}, skipped={skipped}")
 
     # -------------------------
     # VTP view

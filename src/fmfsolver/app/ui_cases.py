@@ -213,6 +213,26 @@ class CasesPanel(QtWidgets.QWidget):
         """Append one log line to the panel log view."""
         self.log.appendPlainText(s)
 
+    def selected_case_rows(self) -> list[dict]:
+        """Return currently selected case rows as dicts in table order."""
+        if self.df_cases is None:
+            return []
+        sel = self.case_table.selectionModel().selectedRows()
+        if not sel:
+            return []
+        idxs: list[int] = []
+        for s in sel:
+            item = self.case_table.item(s.row(), 0)
+            if item is None:
+                continue
+            idx = item.data(QtCore.Qt.ItemDataRole.UserRole)
+            if idx is None:
+                continue
+            idxs.append(int(idx))
+        if not idxs:
+            return []
+        return self.df_cases.loc[idxs].to_dict(orient="records")
+
     def pick_input_file(self):
         """Open a file picker, read case definitions, and refresh the table."""
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -329,12 +349,8 @@ class CasesPanel(QtWidgets.QWidget):
 
         sel = self.case_table.selectionModel().selectedRows()
         if sel:
-            idxs = []
-            for s in sel:
-                item = self.case_table.item(s.row(), 0)
-                if item is not None:
-                    idxs.append(item.data(QtCore.Qt.ItemDataRole.UserRole))
-            df_sel = self.df_cases.loc[idxs].reset_index(drop=True)
+            rows = self.selected_case_rows()
+            df_sel = pd.DataFrame(rows).reset_index(drop=True)
         else:
             df_sel = self.df_cases.copy().reset_index(drop=True)
 
