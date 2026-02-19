@@ -9,6 +9,7 @@ import pyvista as pv
 from PySide6 import QtCore, QtWidgets
 from pyvistaqt import QtInteractor
 
+from ..core.sentman_core import vhat_from_alpha_beta_stl
 from .ui_utils import format_case_text
 
 
@@ -76,6 +77,8 @@ class ViewerPanel(QtWidgets.QWidget):
         self.btn_view_zn = QtWidgets.QPushButton("-Z")
         self.btn_view_iso_1 = QtWidgets.QPushButton("-X -Y +Z")
         self.btn_view_iso_2 = QtWidgets.QPushButton("+X -Y -Z")
+        self.btn_view_wind = QtWidgets.QPushButton("Wind +")
+        self.btn_view_wind_rev = QtWidgets.QPushButton("Wind -")
         self.btn_save_image = QtWidgets.QPushButton("Save Image...")
 
         self.lbl_scalar = QtWidgets.QLabel("Scalar:")
@@ -104,6 +107,8 @@ class ViewerPanel(QtWidgets.QWidget):
             self.btn_view_zn,
             self.btn_view_iso_1,
             self.btn_view_iso_2,
+            self.btn_view_wind,
+            self.btn_view_wind_rev,
             self.btn_save_image,
         ]
         max_width = max(b.sizeHint().width() for b in camera_buttons)
@@ -157,6 +162,8 @@ class ViewerPanel(QtWidgets.QWidget):
         camera_row2.addWidget(spacer)
         camera_row2.addWidget(self.btn_view_iso_1)
         camera_row2.addWidget(self.btn_view_iso_2)
+        camera_row2.addWidget(self.btn_view_wind)
+        camera_row2.addWidget(self.btn_view_wind_rev)
         camera_row2.addWidget(self.btn_save_image)
         camera_row2.addStretch(1)
 
@@ -191,6 +198,8 @@ class ViewerPanel(QtWidgets.QWidget):
         self.btn_view_zn.clicked.connect(lambda: self.set_view_vector((0, 0, -1)))
         self.btn_view_iso_1.clicked.connect(self.set_view_iso_1)
         self.btn_view_iso_2.clicked.connect(self.set_view_iso_2)
+        self.btn_view_wind.clicked.connect(self.set_view_wind)
+        self.btn_view_wind_rev.clicked.connect(self.set_view_wind_reverse)
         self.btn_save_image.clicked.connect(self.save_view_image)
 
     def logln(self, s: str):
@@ -220,6 +229,40 @@ class ViewerPanel(QtWidgets.QWidget):
     def set_view_iso_2(self):
         """Set camera to ISO view ``(+X, -Y, -Z)``."""
         self.plotter.view_vector((1, -1, -1))
+        self.plotter.render()
+
+    def _resolve_current_vhat(self) -> np.ndarray | None:
+        """Resolve current freestream vector from loaded case metadata."""
+        if self._display_case_row is None:
+            return None
+        try:
+            alpha_deg = float(self._display_case_row.get("alpha_deg"))
+            beta_deg = float(self._display_case_row.get("beta_deg"))
+        except Exception:
+            return None
+        try:
+            return vhat_from_alpha_beta_stl(alpha_deg, beta_deg)
+        except Exception:
+            return None
+
+    def set_view_wind(self):
+        """Set camera to freestream direction ``+Vhat`` for current case."""
+        vhat = self._resolve_current_vhat()
+        if vhat is None:
+            self.logln("[WARN] Wind view is unavailable (case alpha/beta not found).")
+            return
+        # view_vector(v) places camera at center+v and looks to center, so use
+        # -Vhat to look along +Vhat.
+        self.plotter.view_vector(tuple((-vhat).tolist()))
+        self.plotter.render()
+
+    def set_view_wind_reverse(self):
+        """Set camera to reverse freestream direction ``-Vhat`` for current case."""
+        vhat = self._resolve_current_vhat()
+        if vhat is None:
+            self.logln("[WARN] Reverse-wind view is unavailable (case alpha/beta not found).")
+            return
+        self.plotter.view_vector(tuple(vhat.tolist()))
         self.plotter.render()
 
     def save_view_image(self):
