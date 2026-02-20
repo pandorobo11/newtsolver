@@ -36,7 +36,7 @@ class ViewerPanel(QtWidgets.QWidget):
         right_layout.addWidget(self.plotter.interactor, 6)
 
         ctrl = QtWidgets.QVBoxLayout()
-        ctrl.setSpacing(4)
+        ctrl.setSpacing(3)
         ctrl.setContentsMargins(0, 0, 0, 0)
 
         self.cmb_scalar = QtWidgets.QComboBox()
@@ -86,101 +86,140 @@ class ViewerPanel(QtWidgets.QWidget):
         self.btn_save_image = QtWidgets.QPushButton("Save Image...")
         self.btn_save_selected_images = QtWidgets.QPushButton("Save Selected...")
 
-        self.lbl_scalar = QtWidgets.QLabel("Scalar:")
-        self.lbl_colorbar = QtWidgets.QLabel("Colorbar range:")
-        self.lbl_camera = QtWidgets.QLabel("Camera:")
-        for lbl in (self.lbl_scalar, self.lbl_colorbar, self.lbl_camera):
+        self.lbl_scalar = QtWidgets.QLabel("SCALAR")
+        self.lbl_colormap = QtWidgets.QLabel("COLORMAP")
+        self.lbl_options = QtWidgets.QLabel("DISPLAY")
+        self.lbl_colorbar = QtWidgets.QLabel("COLORBAR")
+        self.lbl_camera = QtWidgets.QLabel("CAMERA")
+        self.lbl_export = QtWidgets.QLabel("EXPORT")
+        row_labels = (
+            self.lbl_scalar,
+            self.lbl_options,
+            self.lbl_colorbar,
+            self.lbl_camera,
+            self.lbl_export,
+        )
+        for lbl in row_labels:
             lbl.setAlignment(
-                QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+                QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
             )
+            lbl.setStyleSheet("QLabel { color: #b8bcc2; font-weight: 600; }")
+        self.lbl_colormap.setStyleSheet("QLabel { color: #b8bcc2; font-weight: 600; }")
 
         max_label_width = max(
             self.lbl_scalar.sizeHint().width(),
+            self.lbl_options.sizeHint().width(),
             self.lbl_colorbar.sizeHint().width(),
             self.lbl_camera.sizeHint().width(),
+            self.lbl_export.sizeHint().width(),
         )
-        for lbl in (self.lbl_scalar, self.lbl_colorbar, self.lbl_camera):
+        for lbl in row_labels:
             lbl.setFixedWidth(max_label_width)
 
-        ref_height = self.btn_open_vtp.sizeHint().height()
-        camera_buttons = [
+        ref_height = self.btn_auto_range.sizeHint().height()
+        axis_buttons = [
             self.btn_view_xp,
             self.btn_view_xn,
             self.btn_view_yp,
             self.btn_view_yn,
             self.btn_view_zp,
             self.btn_view_zn,
+        ]
+        preset_buttons = [
             self.btn_view_iso_1,
             self.btn_view_iso_2,
             self.btn_view_wind,
             self.btn_view_wind_rev,
+        ]
+        save_buttons = [
             self.btn_save_image,
             self.btn_save_selected_images,
         ]
-        max_width = max(b.sizeHint().width() for b in camera_buttons)
-        for b in camera_buttons:
+        axis_width = max(b.sizeHint().width() for b in axis_buttons)
+        preset_width = max(b.sizeHint().width() for b in preset_buttons)
+        save_width = max(b.sizeHint().width() for b in save_buttons)
+        for b in axis_buttons:
             b.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-            b.setFixedWidth(max_width)
-            b.setMinimumHeight(ref_height)
+            b.setFixedWidth(axis_width)
+            b.setFixedHeight(ref_height)
+        for b in preset_buttons:
+            b.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+            b.setFixedWidth(preset_width)
+            b.setFixedHeight(ref_height)
+        for b in save_buttons:
+            b.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+            b.setFixedWidth(save_width)
+            b.setFixedHeight(ref_height)
 
-        scalar_layout = QtWidgets.QHBoxLayout()
-        scalar_layout.setSpacing(6)
-        scalar_layout.setContentsMargins(0, 0, 0, 0)
-        scalar_layout.addWidget(self.lbl_scalar)
-        scalar_layout.addWidget(self.cmb_scalar)
-        scalar_layout.addWidget(self.chk_edges)
-        scalar_layout.addWidget(self.chk_shield_transparent)
-        scalar_layout.addWidget(self.chk_overlay_text)
-        scalar_layout.addWidget(QtWidgets.QLabel("Colormap:"))
-        scalar_layout.addWidget(self.cmb_cmap)
-        scalar_layout.addWidget(self.btn_open_vtp)
-        scalar_layout.addStretch(1)
+        self.cmb_scalar.setMinimumWidth(145)
+        self.cmb_cmap.setMinimumWidth(105)
+        self.edit_vmin.setMinimumWidth(120)
+        self.edit_vmax.setMinimumWidth(120)
 
-        colorbar_layout = QtWidgets.QHBoxLayout()
-        colorbar_layout.setSpacing(6)
-        colorbar_layout.setContentsMargins(0, 0, 0, 0)
-        colorbar_layout.addWidget(self.lbl_colorbar)
-        colorbar_layout.addWidget(self.edit_vmin)
-        colorbar_layout.addWidget(self.edit_vmax)
-        colorbar_layout.addWidget(self.btn_auto_range)
-        colorbar_layout.addStretch(1)
+        display_row = QtWidgets.QHBoxLayout()
+        display_row.setSpacing(8)
+        display_row.setContentsMargins(0, 0, 0, 0)
+        display_row.addWidget(self.lbl_scalar)
+        display_row.addWidget(self.cmb_scalar)
+        display_row.addSpacing(10)
+        display_row.addWidget(self.lbl_colormap)
+        display_row.addWidget(self.cmb_cmap)
+        display_row.addStretch(1)
+        display_row.addWidget(self.btn_open_vtp)
 
-        camera_block = QtWidgets.QVBoxLayout()
-        camera_block.setSpacing(4)
-        camera_block.setContentsMargins(0, 0, 0, 0)
+        display_options_row = QtWidgets.QHBoxLayout()
+        display_options_row.setSpacing(8)
+        display_options_row.setContentsMargins(0, 0, 0, 0)
+        display_options_row.addWidget(self.lbl_options)
+        display_options_controls = QtWidgets.QHBoxLayout()
+        display_options_controls.setSpacing(18)
+        display_options_controls.setContentsMargins(0, 0, 0, 0)
+        display_options_controls.addWidget(self.chk_edges)
+        display_options_controls.addWidget(self.chk_shield_transparent)
+        display_options_controls.addWidget(self.chk_overlay_text)
+        display_options_row.addLayout(display_options_controls)
+        display_options_row.addStretch(1)
 
-        camera_row1 = QtWidgets.QHBoxLayout()
-        camera_row1.setSpacing(6)
-        camera_row1.setContentsMargins(0, 0, 0, 0)
-        camera_row1.addWidget(self.lbl_camera)
-        camera_row1.addWidget(self.btn_view_xp)
-        camera_row1.addWidget(self.btn_view_xn)
-        camera_row1.addWidget(self.btn_view_yp)
-        camera_row1.addWidget(self.btn_view_yn)
-        camera_row1.addWidget(self.btn_view_zp)
-        camera_row1.addWidget(self.btn_view_zn)
-        camera_row1.addStretch(1)
+        colorbar_row = QtWidgets.QHBoxLayout()
+        colorbar_row.setSpacing(8)
+        colorbar_row.setContentsMargins(0, 0, 0, 0)
+        colorbar_row.addWidget(self.lbl_colorbar)
+        colorbar_row.addWidget(self.edit_vmin)
+        colorbar_row.addWidget(self.edit_vmax)
+        colorbar_row.addWidget(self.btn_auto_range)
+        colorbar_row.addStretch(1)
 
-        camera_row2 = QtWidgets.QHBoxLayout()
-        camera_row2.setSpacing(6)
-        camera_row2.setContentsMargins(0, 0, 0, 0)
-        spacer = QtWidgets.QLabel("")
-        spacer.setFixedWidth(max_label_width)
-        camera_row2.addWidget(spacer)
-        camera_row2.addWidget(self.btn_view_iso_1)
-        camera_row2.addWidget(self.btn_view_iso_2)
-        camera_row2.addWidget(self.btn_view_wind)
-        camera_row2.addWidget(self.btn_view_wind_rev)
-        camera_row2.addWidget(self.btn_save_image)
-        camera_row2.addWidget(self.btn_save_selected_images)
-        camera_row2.addStretch(1)
+        camera_row = QtWidgets.QHBoxLayout()
+        camera_row.setSpacing(6)
+        camera_row.setContentsMargins(0, 0, 0, 0)
+        camera_row.addWidget(self.lbl_camera)
+        camera_row.addWidget(self.btn_view_xp)
+        camera_row.addWidget(self.btn_view_xn)
+        camera_row.addWidget(self.btn_view_yp)
+        camera_row.addWidget(self.btn_view_yn)
+        camera_row.addWidget(self.btn_view_zp)
+        camera_row.addWidget(self.btn_view_zn)
+        camera_row.addSpacing(12)
+        camera_row.addWidget(self.btn_view_iso_1)
+        camera_row.addWidget(self.btn_view_iso_2)
+        camera_row.addSpacing(12)
+        camera_row.addWidget(self.btn_view_wind)
+        camera_row.addWidget(self.btn_view_wind_rev)
+        camera_row.addStretch(1)
 
-        camera_block.addLayout(camera_row1)
-        camera_block.addLayout(camera_row2)
+        camera_row3 = QtWidgets.QHBoxLayout()
+        camera_row3.setSpacing(6)
+        camera_row3.setContentsMargins(0, 0, 0, 0)
+        camera_row3.addWidget(self.lbl_export)
+        camera_row3.addWidget(self.btn_save_image)
+        camera_row3.addWidget(self.btn_save_selected_images)
+        camera_row3.addStretch(1)
 
-        ctrl.addLayout(scalar_layout)
-        ctrl.addLayout(colorbar_layout)
-        ctrl.addLayout(camera_block)
+        ctrl.addLayout(display_row)
+        ctrl.addLayout(display_options_row)
+        ctrl.addLayout(colorbar_row)
+        ctrl.addLayout(camera_row)
+        ctrl.addLayout(camera_row3)
         right_layout.addLayout(ctrl)
 
         self.df_cases = None
