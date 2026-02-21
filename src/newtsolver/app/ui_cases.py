@@ -277,12 +277,7 @@ class CasesPanel(QtWidgets.QWidget):
             self.case_table.setRowCount(0)
             return
 
-        def _mode_from_row(r: dict) -> str:
-            if pd.notna(r.get("Mach")) and pd.notna(r.get("gamma")):
-                return "MG"
-            return "?"
-
-        cols = ["case_id", "mode"] + [c for c in self.df_cases.columns if c != "case_id"]
+        cols = ["case_id"] + [c for c in self.df_cases.columns if c != "case_id"]
         self.case_table.clear()
         self.case_table.setColumnCount(len(cols))
         self.case_table.setRowCount(len(self.df_cases))
@@ -290,7 +285,6 @@ class CasesPanel(QtWidgets.QWidget):
 
         for row_idx, (_, row) in enumerate(self.df_cases.iterrows()):
             row_dict = row.to_dict()
-            row_dict["mode"] = _mode_from_row(row_dict)
             for col_idx, col in enumerate(cols):
                 val = row_dict.get(col, "")
                 text = "" if pd.isna(val) else str(val)

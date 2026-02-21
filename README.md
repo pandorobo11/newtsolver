@@ -62,7 +62,7 @@ uv run newtsolver-cli \
   --input samples/input_template.csv \
   --workers 4 \
   --output outputs/result.csv \
-  --cases baseline_cube_modeA baseline_double_plate_shield_on
+  --cases baseline_cube baseline_double_plate_shield_on
 ```
 
 ## Input File Specification (Common)
@@ -187,7 +187,7 @@ Examples:
 uv run newtsolver-cli --input samples/input_template.csv
 
 # Run selected cases with 4 workers
-uv run newtsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cube_modeA baseline_double_plate_shield_on
+uv run newtsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cube baseline_double_plate_shield_on
 
 # Specify output path
 uv run newtsolver-cli --input samples/input_template.csv -o outputs/custom_result.csv
@@ -230,7 +230,6 @@ Main outputs:
 | `run_started_at_utc` | ISO8601 string | Run start timestamp (UTC) | Per case execution. |
 | `run_finished_at_utc` | ISO8601 string | Run end timestamp (UTC) | Per case execution. |
 | `run_elapsed_s` | float | Elapsed time [s] | Per case execution wall time. |
-| `mode` | string | Resolved mode | `MG` (Mach+gamma). |
 | `out_attitude_input` | string | Resolved attitude input mode | Prefixed with `out_` because `attitude_input` also exists in input columns. |
 | `alpha_t_deg_resolved` | float | Resolved `alpha_t` [deg] | Tangent-definition angle used in coefficient transform. |
 | `beta_t_deg_resolved` | float | Resolved `beta_t` [deg] | Tangent-definition angle used in coefficient transform. |

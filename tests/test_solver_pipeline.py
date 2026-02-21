@@ -229,7 +229,6 @@ class TestSolverPipeline(unittest.TestCase):
             }
             result = run_case(row, lambda _msg: None)
 
-            self.assertEqual(result["mode"], "MG")
             self.assertGreater(result["faces"], 0)
             self.assertEqual(result["vtp_path"], "")
             self.assertEqual(result["npz_path"], "")
@@ -267,7 +266,6 @@ class TestSolverPipeline(unittest.TestCase):
             }
             result = run_case(row, lambda _msg: None)
 
-            self.assertEqual(result["mode"], "MG")
             self.assertGreater(result["faces"], 0)
             self.assertEqual(result["vtp_path"], "")
             self.assertEqual(result["npz_path"], "")

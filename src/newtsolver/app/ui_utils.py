@@ -33,7 +33,6 @@ def format_case_text(row: dict) -> str:
     if str(row.get("Mach")).strip() not in ("", "nan", "None") and str(
         row.get("gamma")
     ).strip() not in ("", "nan", "None"):
-        add("mode", "MG")
         add("Mach", row.get("Mach"))
         add("gamma", row.get("gamma"))
 

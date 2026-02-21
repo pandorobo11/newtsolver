@@ -51,12 +51,6 @@ def _maybe_log_ray_accel_hint(logfn) -> None:
     _RAY_ACCEL_HINT_SHOWN = True
 
 
-def _mode_from_row(row: dict) -> str:
-    """Return canonical solver mode for current newtsolver input schema."""
-    _ = row
-    return "MG"
-
-
 def _validate_mach_gamma(row: dict) -> tuple[float, float]:
     """Validate and return ``(Mach, gamma)``."""
     Mach = float(row["Mach"])
@@ -410,7 +404,6 @@ def run_case(row: dict, logfn) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     _validate_mach_gamma(row)
-    mode = _mode_from_row(row)
     signature = build_case_signature(row)
 
     Vhat, alpha_t_deg, beta_t_deg, attitude_mode = resolve_attitude_to_vhat(
@@ -542,7 +535,6 @@ def run_case(row: dict, logfn) -> dict:
         "run_started_at_utc": started_at_utc,
         "run_finished_at_utc": finished_at_utc,
         "run_elapsed_s": float(elapsed_s),
-        "mode": mode,
         "attitude_input": attitude_mode,
         "alpha_t_deg_resolved": float(alpha_t_deg),
         "beta_t_deg_resolved": float(beta_t_deg),
