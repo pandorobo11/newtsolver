@@ -123,6 +123,8 @@ def _compute_case_integrals(
     windward_eq: str,
     leeward_eq: str,
     cp_max: float,
+    Mach: float,
+    gamma: float,
 ) -> dict:
     """Compute per-face and integrated coefficients for one case."""
     dC_dA_arr = newtonian_dC_dA_vectors(
@@ -133,6 +135,8 @@ def _compute_case_integrals(
         cp_max=cp_max,
         windward_eq=windward_eq,
         leeward_eq=leeward_eq,
+        Mach=Mach,
+        gamma=gamma,
     )
 
     C_face_stl = dC_dA_arr * areas[:, None]
@@ -468,6 +472,8 @@ def run_case(row: dict, logfn) -> dict:
         windward_eq=windward_eq,
         leeward_eq=leeward_eq,
         cp_max=cp_max,
+        Mach=Mach,
+        gamma=gamma,
     )
 
     C_face_stl = calc["C_face_stl"]

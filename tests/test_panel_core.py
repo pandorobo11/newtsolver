@@ -9,6 +9,7 @@ from newtsolver.core.panel_core import (
     modified_newtonian_cp_max,
     newtonian_dC_dA_vector,
     newtonian_dC_dA_vectors,
+    prandtl_meyer_pressure_coefficient,
     resolve_attitude_to_vhat,
     stl_to_body,
 )
@@ -84,6 +85,25 @@ class TestPanelCore(unittest.TestCase):
             windward_eq="modified_newtonian",
         )
         np.testing.assert_allclose(v, np.array([cp_max, 0.0, 0.0]), rtol=0.0, atol=1e-12)
+
+    def test_prandtl_meyer_leeward_pressure_is_negative_and_bounded(self):
+        cp = prandtl_meyer_pressure_coefficient(Mach=6.0, gamma=1.4, deltar=math.radians(-10.0))
+        cp_vac = -2.0 / (1.4 * 6.0 * 6.0)
+        self.assertLess(cp, 0.0)
+        self.assertGreaterEqual(cp, cp_vac)
+
+    def test_leeward_prandtl_meyer_generates_force(self):
+        v = newtonian_dC_dA_vector(
+            Vhat=np.array([1.0, 0.0, 0.0]),
+            n_out=np.array([1.0, 0.0, 0.0]),
+            Aref=1.0,
+            shielded=False,
+            leeward_eq="prandtl_meyer",
+            Mach=6.0,
+            gamma=1.4,
+        )
+        self.assertGreater(float(v[0]), 0.0)
+        self.assertLess(float(v[0]), 2.0)
 
     def test_stl_to_body_axis_mapping(self):
         v_stl = np.array([2.0, -3.0, 4.5], dtype=float)

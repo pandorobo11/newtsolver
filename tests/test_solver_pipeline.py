@@ -315,6 +315,40 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertGreater(float(result_mn["CA"]), 0.0)
             self.assertLess(float(result_mn["CA"]), float(result_n["CA"]))
 
+    def test_run_case_prandtl_meyer_changes_leeward_model(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
+            row_shield = {
+                "case_id": "test_case_leeward_shield",
+                "stl_path": "samples/stl/cube.stl",
+                "stl_scale_m_per_unit": 1.0,
+                "alpha_deg": 0.0,
+                "beta_or_bank_deg": 0.0,
+                "ref_x_m": 0.0,
+                "ref_y_m": 0.0,
+                "ref_z_m": 0.0,
+                "Aref_m2": 1.0,
+                "Lref_Cl_m": 1.0,
+                "Lref_Cm_m": 1.0,
+                "Lref_Cn_m": 1.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
+                "windward_eq": "newtonian",
+                "leeward_eq": "shield",
+                "shielding_on": 0,
+                "save_vtp_on": 0,
+                "save_npz_on": 0,
+                "out_dir": td,
+            }
+            row_pm = {
+                **row_shield,
+                "case_id": "test_case_leeward_prandtl",
+                "leeward_eq": "prandtl_meyer",
+            }
+            result_shield = run_case(row_shield, lambda _msg: None)
+            result_pm = run_case(row_pm, lambda _msg: None)
+
+            self.assertGreater(float(result_pm["CA"]), float(result_shield["CA"]))
+
     def test_run_case_forwards_ray_backend_to_shielding(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {

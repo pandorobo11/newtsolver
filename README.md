@@ -83,7 +83,7 @@ Supported formats:
 | `Mach` | Yes | float | Mach number | Freestream Mach number. Must be > 0. |
 | `gamma` | Yes | float | - | Ratio of specific heats. Must be > 1. |
 | `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, or `shield` (`Cp=0`). |
-| `leeward_eq` | No | string | Leeward pressure equation | `shield` (default) or `newtonian_mirror`. |
+| `leeward_eq` | No | string | Leeward pressure equation | `shield` (default), `newtonian_mirror`, or `prandtl_meyer`. |
 | `alpha_deg` | Yes | deg | 1st attitude angle | Meaning depends on `attitude_input`. |
 | `beta_or_bank_deg` | Yes | deg | 2nd attitude angle | `beta` for `beta_tan`/`beta_sin`, `bank angle (phi)` for `bank`. |
 | `attitude_input` | No | string | Attitude-angle definition | `beta_tan` (default), `beta_sin`, `bank`. |
@@ -113,6 +113,7 @@ Flow input rules:
 - `leeward_eq`
   - `shield` (default): leeward contribution is forced to `Cp = 0`.
   - `newtonian_mirror`: applies Newtonian-mirror magnitude on leeward faces (`Cp = 2 * (n_in·Vhat)^2` with `n_in·Vhat <= 0`).
+  - `prandtl_meyer`: applies Prandtl-Meyer expansion pressure from freestream `Mach`/`gamma` and local deflection (`Cp <= 0`).
 
 ### Ray Backend (`ray_backend`)
 

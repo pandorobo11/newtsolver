@@ -8,7 +8,7 @@ import numpy as np
 
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
 WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "shield"}
-LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror"}
+LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror", "prandtl_meyer"}
 
 def _resolve_attitude_mode(attitude_input: str | None) -> str:
     """Return canonical attitude mode with default and validation."""
@@ -38,7 +38,7 @@ def _resolve_leeward_equation(value: str | None) -> str:
     if eq not in LEEWARD_EQUATION_VALUES:
         raise ValueError(
             f"Invalid leeward_eq: '{value}'. "
-            "Expected one of: shield, newtonian_mirror."
+            "Expected one of: shield, newtonian_mirror, prandtl_meyer."
         )
     return eq
 
@@ -67,6 +67,72 @@ def modified_newtonian_cp_max(Mach: float, gamma: float) -> float:
     if not math.isfinite(cp_max) or cp_max < 0.0:
         raise ValueError(f"Invalid Cp_max computed: {cp_max}")
     return float(cp_max)
+
+
+def _prandtl_meyer_nu(Mach: np.ndarray, gamma: float) -> np.ndarray:
+    """Return Prandtl-Meyer angle ``nu`` [rad] for ``Mach > 1``."""
+    g = float(gamma)
+    m = np.asarray(Mach, dtype=float)
+    m2 = np.square(m)
+    beta = np.sqrt(np.maximum(m2 - 1.0, 0.0))
+    a = math.sqrt((g + 1.0) / (g - 1.0))
+    b = math.sqrt((g - 1.0) / (g + 1.0))
+    return a * np.arctan(b * beta) - np.arctan(beta)
+
+
+def _inverse_prandtl_meyer(nu_target: np.ndarray, gamma: float) -> np.ndarray:
+    """Invert Prandtl-Meyer angle ``nu`` [rad] to Mach number."""
+    g = float(gamma)
+    nu = np.asarray(nu_target, dtype=float)
+    m = np.full_like(nu, 2.0, dtype=float)
+    m = np.maximum(m, 1.000001 + nu)
+
+    for _ in range(20):
+        nu_m = _prandtl_meyer_nu(m, g)
+        f = nu_m - nu
+        m2 = np.square(m)
+        deriv = np.sqrt(np.maximum(m2 - 1.0, 1e-16)) / (
+            m * (1.0 + 0.5 * (g - 1.0) * m2)
+        )
+        step = f / np.maximum(deriv, 1e-16)
+        m_next = np.maximum(1.000001, m - step)
+        if np.max(np.abs(m_next - m)) < 1e-10:
+            m = m_next
+            break
+        m = m_next
+    return m
+
+
+def prandtl_meyer_pressure_coefficient(Mach: float, gamma: float, deltar: float) -> float:
+    """Return expansion pressure coefficient from Prandtl-Meyer relation.
+
+    Args:
+        Mach: Freestream Mach number (>1).
+        gamma: Ratio of specific heats (>1).
+        deltar: Local flow turning angle [rad], negative for expansion.
+    """
+    M1 = float(Mach)
+    g = float(gamma)
+    d = float(deltar)
+    if M1 <= 1.0:
+        raise ValueError(f"prandtl_meyer requires Mach > 1, got {M1}")
+    if g <= 1.0:
+        raise ValueError(f"gamma must be > 1, got {g}")
+    if d >= 0.0:
+        return 0.0
+
+    nu1 = float(_prandtl_meyer_nu(np.array([M1], dtype=float), g)[0])
+    nu2 = nu1 - d
+    nu_max = 0.5 * math.pi * (math.sqrt((g + 1.0) / (g - 1.0)) - 1.0)
+    cp_vac = -2.0 / (g * M1 * M1)
+    if nu2 >= nu_max:
+        return cp_vac
+
+    M2 = float(_inverse_prandtl_meyer(np.array([nu2], dtype=float), g)[0])
+    bracket = (1.0 + 0.5 * (g - 1.0) * M2 * M2) / (1.0 + 0.5 * (g - 1.0) * M1 * M1)
+    p2_p1 = bracket ** (-g / (g - 1.0))
+    cp = (2.0 / (g * M1 * M1)) * (p2_p1 - 1.0)
+    return max(cp, cp_vac)
 
 
 def _resolve_attitude_beta_tan(alpha_in: float, beta_in: float) -> tuple[np.ndarray, float, float]:
@@ -175,6 +241,8 @@ def newtonian_dC_dA_vector(
     cp_max: float = 2.0,
     windward_eq: str = "newtonian",
     leeward_eq: str = "shield",
+    Mach: float | None = None,
+    gamma: float | None = None,
 ) -> np.ndarray:
     """Compute panel force-coefficient density vector ``dC/dA`` by Newtonian rule.
 
@@ -200,7 +268,13 @@ def newtonian_dC_dA_vector(
     else:
         if leeward_eq == "shield":
             return np.zeros(3, dtype=float)
-        cp = float(cp_max) * (gamma_n * gamma_n)
+        if leeward_eq == "newtonian_mirror":
+            cp = float(cp_max) * (gamma_n * gamma_n)
+        else:
+            if Mach is None or gamma is None:
+                raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")
+            deltar = math.asin(max(-1.0, min(1.0, gamma_n)))
+            cp = prandtl_meyer_pressure_coefficient(Mach=float(Mach), gamma=float(gamma), deltar=deltar)
 
     return -(cp / float(Aref)) * n_out
 
@@ -213,6 +287,8 @@ def newtonian_dC_dA_vectors(
     cp_max: float = 2.0,
     windward_eq: str = "newtonian",
     leeward_eq: str = "shield",
+    Mach: float | None = None,
+    gamma: float | None = None,
 ) -> np.ndarray:
     """Compute Newtonian ``dC/dA`` for multiple panels in one call.
 
@@ -258,9 +334,20 @@ def newtonian_dC_dA_vectors(
         cp[windward] = float(cp_max) * np.square(gamma_n[windward])
     if leeward_eq == "newtonian_mirror":
         cp[~windward] = float(cp_max) * np.square(gamma_n[~windward])
+    elif leeward_eq == "prandtl_meyer":
+        if Mach is None or gamma is None:
+            raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")
+        leeward_idx = np.where(~windward)[0]
+        gamma_n_lee = np.clip(gamma_n[leeward_idx], -1.0, 1.0)
+        for i, gn in zip(leeward_idx, gamma_n_lee):
+            cp[i] = prandtl_meyer_pressure_coefficient(
+                Mach=float(Mach),
+                gamma=float(gamma),
+                deltar=float(math.asin(float(gn))),
+            )
 
     out_active = np.zeros_like(n_in)
-    nonzero = cp > 0.0
+    nonzero = np.abs(cp) > 0.0
     if np.any(nonzero):
         out_active[nonzero] = -(cp[nonzero, None] / float(Aref)) * n_out[active][nonzero]
     out[active] = out_active
