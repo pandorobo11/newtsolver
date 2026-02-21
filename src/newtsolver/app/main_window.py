@@ -9,11 +9,11 @@ from .viewer import ViewerPanel
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    """Main application window for the FMF solver GUI."""
+    """Main application window for the newtsolver GUI."""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Sentman FMF Solver (GUI)")
+        self.setWindowTitle("newtsolver (GUI)")
         self.resize(1480, 900)
 
         central = QtWidgets.QWidget()

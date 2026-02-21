@@ -10,7 +10,7 @@ from .main_window import MainWindow
 
 
 def main():
-    """Launch the Qt-based FMF solver GUI."""
+    """Launch the Qt-based newtsolver GUI."""
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
     w.show()

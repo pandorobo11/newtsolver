@@ -29,9 +29,6 @@ def build_case_signature(row: dict) -> str:
         "Lref_Cl_m",
         "Lref_Cm_m",
         "Lref_Cn_m",
-        "Tw_K",
-        "S",
-        "Ti_K",
         "shielding_on",
         "ray_backend",
     ]
@@ -48,9 +45,6 @@ def build_case_signature(row: dict) -> str:
         "Lref_Cl_m",
         "Lref_Cm_m",
         "Lref_Cn_m",
-        "Tw_K",
-        "S",
-        "Ti_K",
         "shielding_on",
     }
 

@@ -14,9 +14,7 @@ import numpy as np
 import pandas as pd
 from trimesh import ray as trimesh_ray
 
-from ..common import is_filled
 from ..io.exporters import export_npz, export_vtp
-from ..physics.us1976 import mean_to_most_probable_speed, sample_at_altitude_km
 from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
@@ -54,60 +52,20 @@ def _maybe_log_ray_accel_hint(logfn) -> None:
 
 
 def _mode_from_row(row: dict) -> str:
-    """Determine input mode for a case row.
-
-    Preferred mode requires ``Mach`` and ``gamma``.
-    Legacy modes are still accepted for compatibility.
-    """
-    mg_ok = is_filled(row.get("Mach")) and is_filled(row.get("gamma"))
-    a_ok = is_filled(row.get("S")) and is_filled(row.get("Ti_K"))
-    b_ok = is_filled(row.get("Mach")) and is_filled(row.get("Altitude_km"))
-    if mg_ok:
-        return "MG"
-    if a_ok:
-        return "A"
-    if b_ok:
-        return "B"
-    raise ValueError(
-        f"Case '{row.get('case_id')}' is missing required inputs. "
-        "Provide Mach+gamma (preferred)."
-    )
+    """Return canonical solver mode for current newtsolver input schema."""
+    _ = row
+    return "MG"
 
 
-def _compute_S_Ti_Tw_mode(row: dict) -> tuple[float, float, float, str]:
-    """Return ``(S, Ti, Tw, mode)`` derived from case inputs."""
-    mode = _mode_from_row(row)
-
-    if mode == "A":
-        S = float(row["S"])
-        Ti = float(row["Ti_K"])
-        Tw = float(row["Tw_K"]) if is_filled(row.get("Tw_K")) else Ti
-        return S, Ti, Tw, mode
-
-    if mode == "MG":
-        Mach = float(row["Mach"])
-        gamma = float(row["gamma"])
-        if gamma <= 0.0:
-            raise ValueError(f"gamma must be > 0, got {gamma}")
-        # For perfect gas: V/sqrt(2RT) = Mach * sqrt(gamma/2).
-        S = Mach * math.sqrt(gamma / 2.0)
-        Ti = float(row["Ti_K"]) if is_filled(row.get("Ti_K")) else 300.0
-        Tw = float(row["Tw_K"]) if is_filled(row.get("Tw_K")) else Ti
-        return S, Ti, Tw, mode
-
+def _validate_mach_gamma(row: dict) -> tuple[float, float]:
+    """Validate and return ``(Mach, gamma)``."""
     Mach = float(row["Mach"])
-    alt = float(row["Altitude_km"])
-
-    atm = sample_at_altitude_km(alt)
-    Ti = float(atm["T_K"])
-    c = float(atm["c_ms"])
-    v_mean = float(atm["Vmean_ms"])
-    v_mp = mean_to_most_probable_speed(v_mean)
-
-    V_bulk = Mach * c
-    S = V_bulk / v_mp
-    Tw = float(row["Tw_K"]) if is_filled(row.get("Tw_K")) else Ti
-    return S, Ti, Tw, mode
+    gamma = float(row["gamma"])
+    if Mach <= 0.0:
+        raise ValueError(f"Mach must be > 0, got {Mach}")
+    if gamma <= 1.0:
+        raise ValueError(f"gamma must be > 1, got {gamma}")
+    return Mach, gamma
 
 
 def _compute_force_coeffs(C_force_stl: np.ndarray, alpha_t_deg: float) -> dict[str, float]:
@@ -159,9 +117,6 @@ def _compute_case_integrals(
     areas: np.ndarray,
     centers_stl: np.ndarray,
     face_stl_index: np.ndarray,
-    S: float,
-    Ti: float,
-    Tw: float,
     Aref: float,
     ref_body: np.ndarray,
     alpha_t_deg: float,
@@ -297,9 +252,6 @@ def _export_case_artifacts(
     stl_paths_order: list[str],
     normals_out_stl: np.ndarray,
     Vhat: np.ndarray,
-    S: float,
-    Ti: float,
-    Tw: float,
     Aref: float,
     C_force_stl: np.ndarray,
     C_force_body: np.ndarray,
@@ -355,9 +307,6 @@ def _export_case_artifacts(
             areas_m2=areas,
             shielded=shielded,
             Vhat_stl=Vhat,
-            S=S,
-            Ti_K=Ti,
-            Tw_K=Tw,
             Aref_m2=Aref,
             attitude_input=attitude_mode,
             alpha_t_deg_resolved=alpha_t_deg,
@@ -460,7 +409,8 @@ def run_case(row: dict, logfn) -> dict:
     out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    S, Ti, Tw, mode = _compute_S_Ti_Tw_mode(row)
+    _validate_mach_gamma(row)
+    mode = _mode_from_row(row)
     signature = build_case_signature(row)
 
     Vhat, alpha_t_deg, beta_t_deg, attitude_mode = resolve_attitude_to_vhat(
@@ -496,9 +446,6 @@ def run_case(row: dict, logfn) -> dict:
         areas=areas,
         centers_stl=centers_stl,
         face_stl_index=face_stl_index,
-        S=S,
-        Ti=Ti,
-        Tw=Tw,
         Aref=Aref,
         ref_body=ref_body,
         alpha_t_deg=alpha_t_deg,
@@ -571,9 +518,6 @@ def run_case(row: dict, logfn) -> dict:
         stl_paths_order=stl_paths_order,
         normals_out_stl=normals_out_stl,
         Vhat=Vhat,
-        S=S,
-        Ti=Ti,
-        Tw=Tw,
         Aref=Aref,
         C_force_stl=C_force_stl,
         C_force_body=C_force_body,
@@ -599,8 +543,6 @@ def run_case(row: dict, logfn) -> dict:
         "run_finished_at_utc": finished_at_utc,
         "run_elapsed_s": float(elapsed_s),
         "mode": mode,
-        "S": float(S),
-        "Ti_K": float(Ti),
         "attitude_input": attitude_mode,
         "alpha_t_deg_resolved": float(alpha_t_deg),
         "beta_t_deg_resolved": float(beta_t_deg),

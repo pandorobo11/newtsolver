@@ -1,4 +1,4 @@
-"""Command-line interface for running FMF cases without the GUI."""
+"""Command-line interface for running aerodynamic cases without the GUI."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="newtsolver-cli",
-        description="Run FMF solver from CSV/Excel input without GUI.",
+        description="Run newtsolver from CSV/Excel input without GUI.",
     )
     parser.add_argument(
         "-i",

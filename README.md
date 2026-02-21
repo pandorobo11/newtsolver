@@ -1,6 +1,6 @@
 # newtsolver
 
-Sentman free-molecular-flow (FMF) panel solver for STL geometry.
+Hypersonic panel solver for STL geometry.
 
 - GUI: case table selection, run, and VTP visualization.
 - CLI: batch execution from CSV/Excel input file.
@@ -100,7 +100,6 @@ Supported formats:
 
 Flow input rules:
 - Provide `Mach` and `gamma` in every row.
-- Legacy columns (`S`, `Ti_K`, `Tw_K`, `Altitude_km`) are optional compatibility fields and are not required.
 
 ### Ray Backend (`ray_backend`)
 
@@ -231,9 +230,7 @@ Main outputs:
 | `run_started_at_utc` | ISO8601 string | Run start timestamp (UTC) | Per case execution. |
 | `run_finished_at_utc` | ISO8601 string | Run end timestamp (UTC) | Per case execution. |
 | `run_elapsed_s` | float | Elapsed time [s] | Per case execution wall time. |
-| `mode` | string | Resolved mode | Typically `MG` (Mach+gamma). Legacy inputs may yield `A` or `B`. |
-| `out_S` | float | Effective molecular speed ratio | Computed from flow inputs; exported with `out_` prefix. |
-| `out_Ti_K` | float | Effective translational temperature [K] | Internal effective value used in the solver pipeline. |
+| `mode` | string | Resolved mode | `MG` (Mach+gamma). |
 | `out_attitude_input` | string | Resolved attitude input mode | Prefixed with `out_` because `attitude_input` also exists in input columns. |
 | `alpha_t_deg_resolved` | float | Resolved `alpha_t` [deg] | Tangent-definition angle used in coefficient transform. |
 | `beta_t_deg_resolved` | float | Resolved `beta_t` [deg] | Tangent-definition angle used in coefficient transform. |
@@ -262,12 +259,6 @@ Main outputs:
   - `gamma` is physically invalid (or missing/invalid numeric).
 - VTP not auto-loaded when selecting case:
   - VTP may be missing or `case_signature` does not match current case conditions.
-
-## Data Source
-
-US1976 atmospheric tables (Table 1 and Table 2) are sourced from PDAS Big Tables:
-
-https://www.pdas.com/bigtables.html
 
 ## Development
 

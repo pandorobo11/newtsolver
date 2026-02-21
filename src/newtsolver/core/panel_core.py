@@ -196,35 +196,6 @@ def newtonian_dC_dA_vectors(
         out[active] = out_active
     return out
 
-
-def sentman_dC_dA_vector(
-    Vhat: np.ndarray,
-    n_out: np.ndarray,
-    S: float,
-    Ti: float,
-    Tw: float,
-    Aref: float,
-    shielded: bool = False,
-) -> np.ndarray:
-    """Backward-compatible alias for the Newtonian panel model."""
-    _ = (S, Ti, Tw)
-    return newtonian_dC_dA_vector(Vhat=Vhat, n_out=n_out, Aref=Aref, shielded=shielded)
-
-
-def sentman_dC_dA_vectors(
-    Vhat: np.ndarray,
-    n_out: np.ndarray,
-    S: float,
-    Ti: float,
-    Tw: float,
-    Aref: float,
-    shielded: np.ndarray | bool = False,
-) -> np.ndarray:
-    """Backward-compatible alias for the Newtonian panel model."""
-    _ = (S, Ti, Tw)
-    return newtonian_dC_dA_vectors(Vhat=Vhat, n_out=n_out, Aref=Aref, shielded=shielded)
-
-
 def stl_to_body(v_stl: np.ndarray) -> np.ndarray:
     """Convert a vector from STL axes to body axes.
 

@@ -66,7 +66,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 10.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -74,8 +73,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 1,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -87,7 +86,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 5.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -95,8 +93,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 1,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -119,7 +117,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 0.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -127,8 +124,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -140,7 +137,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 5.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -148,8 +144,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -161,7 +157,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 10.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -169,8 +164,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -189,7 +184,6 @@ class TestSolverPipeline(unittest.TestCase):
             "stl_scale_m_per_unit": 1,
             "alpha_deg": 5,
             "beta_or_bank_deg": 0,
-            "Tw_K": 300,
             "ref_x_m": 0,
             "ref_y_m": 0,
             "ref_z_m": 0,
@@ -197,30 +191,28 @@ class TestSolverPipeline(unittest.TestCase):
             "Lref_Cl_m": 1,
             "Lref_Cm_m": 1,
             "Lref_Cn_m": 1,
-            "S": 5,
-            "Ti_K": 300,
+            "Mach": 6.0,
+            "gamma": 1.4,
             "shielding_on": 0,
         }
         row_float = {
             **row_int,
             "stl_scale_m_per_unit": 1.0,
             "alpha_deg": 5.0,
-            "Tw_K": 300.0,
             "Aref_m2": 1.0,
-            "S": 5.0,
-            "Ti_K": 300.0,
+            "Mach": 6.0,
+            "gamma": 1.4,
         }
         self.assertEqual(build_case_signature(row_int), build_case_signature(row_float))
 
-    def test_run_case_mode_a_smoke(self):
+    def test_run_case_mode_mg_smoke(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
-                "case_id": "test_mode_a",
+                "case_id": "test_mode_mg",
                 "stl_path": "samples/stl/cube.stl",
                 "stl_scale_m_per_unit": 1.0,
                 "alpha_deg": 5.0,
                 "beta_or_bank_deg": 0.0,
-                "Tw_K": 300.0,
                 "ref_x_m": 0.0,
                 "ref_y_m": 0.0,
                 "ref_z_m": 0.0,
@@ -228,8 +220,8 @@ class TestSolverPipeline(unittest.TestCase):
                 "Lref_Cl_m": 1.0,
                 "Lref_Cm_m": 1.0,
                 "Lref_Cn_m": 1.0,
-                "S": 5.0,
-                "Ti_K": 300.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
                 "shielding_on": 0,
                 "save_vtp_on": 0,
                 "save_npz_on": 0,
@@ -237,7 +229,7 @@ class TestSolverPipeline(unittest.TestCase):
             }
             result = run_case(row, lambda _msg: None)
 
-            self.assertEqual(result["mode"], "A")
+            self.assertEqual(result["mode"], "MG")
             self.assertGreater(result["faces"], 0)
             self.assertEqual(result["vtp_path"], "")
             self.assertEqual(result["npz_path"], "")
@@ -251,15 +243,14 @@ class TestSolverPipeline(unittest.TestCase):
                 self.assertTrue(math.isfinite(float(result[key])), key)
             self.assertTrue(Path(td).exists())
 
-    def test_run_case_mode_b_smoke(self):
+    def test_run_case_high_mach_mg_smoke(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
-                "case_id": "test_mode_b",
+                "case_id": "test_high_mach_mg",
                 "stl_path": "samples/stl/plate.stl",
                 "stl_scale_m_per_unit": 1.0,
                 "alpha_deg": 5.0,
                 "beta_or_bank_deg": 0.0,
-                "Tw_K": 300.0,
                 "ref_x_m": 0.0,
                 "ref_y_m": 0.0,
                 "ref_z_m": 0.0,
@@ -268,7 +259,7 @@ class TestSolverPipeline(unittest.TestCase):
                 "Lref_Cm_m": 1.0,
                 "Lref_Cn_m": 1.0,
                 "Mach": 25.0,
-                "Altitude_km": 100.0,
+                "gamma": 1.4,
                 "shielding_on": 0,
                 "save_vtp_on": 0,
                 "save_npz_on": 0,
@@ -276,7 +267,7 @@ class TestSolverPipeline(unittest.TestCase):
             }
             result = run_case(row, lambda _msg: None)
 
-            self.assertEqual(result["mode"], "B")
+            self.assertEqual(result["mode"], "MG")
             self.assertGreater(result["faces"], 0)
             self.assertEqual(result["vtp_path"], "")
             self.assertEqual(result["npz_path"], "")
@@ -286,7 +277,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertTrue(str(result["run_started_at_utc"]).endswith("Z"))
             self.assertTrue(str(result["run_finished_at_utc"]).endswith("Z"))
             self.assertGreaterEqual(float(result["run_elapsed_s"]), 0.0)
-            for key in ("S", "Ti_K", "CA", "CY", "CN", "CD", "CL"):
+            for key in ("CA", "CY", "CN", "Cl", "Cm", "Cn", "CD", "CL"):
                 self.assertTrue(math.isfinite(float(result[key])), key)
 
     def test_run_case_forwards_ray_backend_to_shielding(self):
@@ -297,7 +288,6 @@ class TestSolverPipeline(unittest.TestCase):
                 "stl_scale_m_per_unit": 1.0,
                 "alpha_deg": 5.0,
                 "beta_or_bank_deg": 0.0,
-                "Tw_K": 300.0,
                 "ref_x_m": 0.0,
                 "ref_y_m": 0.0,
                 "ref_z_m": 0.0,
@@ -305,8 +295,8 @@ class TestSolverPipeline(unittest.TestCase):
                 "Lref_Cl_m": 1.0,
                 "Lref_Cm_m": 1.0,
                 "Lref_Cn_m": 1.0,
-                "S": 5.0,
-                "Ti_K": 300.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
                 "shielding_on": 1,
                 "ray_backend": "rtree",
                 "save_vtp_on": 0,
@@ -340,7 +330,6 @@ class TestSolverPipeline(unittest.TestCase):
                     "stl_scale_m_per_unit": 1.0,
                     "alpha_deg": 0.0,
                     "beta_or_bank_deg": 0.0,
-                    "Tw_K": 300.0,
                     "ref_x_m": 0.0,
                     "ref_y_m": 0.0,
                     "ref_z_m": 0.0,
@@ -348,8 +337,8 @@ class TestSolverPipeline(unittest.TestCase):
                     "Lref_Cl_m": 1.0,
                     "Lref_Cm_m": 1.0,
                     "Lref_Cn_m": 1.0,
-                    "S": 5.0,
-                    "Ti_K": 300.0,
+                    "Mach": 6.0,
+                    "gamma": 1.4,
                     "shielding_on": 0,
                     "save_vtp_on": 0,
                     "save_npz_on": 0,
@@ -370,7 +359,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 0.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -378,8 +366,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -406,7 +394,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": float(i),
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -414,8 +401,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -447,7 +434,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 5.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -455,8 +441,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -495,7 +481,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 0.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -503,8 +488,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -532,7 +517,6 @@ class TestSolverPipeline(unittest.TestCase):
                         "stl_scale_m_per_unit": 1.0,
                         "alpha_deg": 0.0,
                         "beta_or_bank_deg": 0.0,
-                        "Tw_K": 300.0,
                         "ref_x_m": 0.0,
                         "ref_y_m": 0.0,
                         "ref_z_m": 0.0,
@@ -540,8 +524,8 @@ class TestSolverPipeline(unittest.TestCase):
                         "Lref_Cl_m": 1.0,
                         "Lref_Cm_m": 1.0,
                         "Lref_Cn_m": 1.0,
-                        "S": 5.0,
-                        "Ti_K": 300.0,
+                        "Mach": 6.0,
+                        "gamma": 1.4,
                         "shielding_on": 0,
                         "save_vtp_on": 0,
                         "save_npz_on": 0,
@@ -592,7 +576,6 @@ class TestSolverPipeline(unittest.TestCase):
                 "stl_scale_m_per_unit": 1.0,
                 "alpha_deg": 5.0,
                 "beta_or_bank_deg": 0.0,
-                "Tw_K": 300.0,
                 "ref_x_m": 0.0,
                 "ref_y_m": 0.0,
                 "ref_z_m": 0.0,
@@ -600,8 +583,8 @@ class TestSolverPipeline(unittest.TestCase):
                 "Lref_Cl_m": 1.0,
                 "Lref_Cm_m": 1.0,
                 "Lref_Cn_m": 1.0,
-                "S": 5.0,
-                "Ti_K": 300.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
                 "shielding_on": 0,
                 "save_vtp_on": 1,
                 "save_npz_on": 0,

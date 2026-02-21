@@ -73,12 +73,6 @@ NUMERIC_REQUIRED = [
     "Lref_Cn_m",
 ]
 
-NUMERIC_OPTIONAL = [
-    "S",
-    "Ti_K",
-    "Tw_K",
-]
-
 POSITIVE_COLUMNS = {
     "stl_scale_m_per_unit",
     "Mach",
@@ -206,19 +200,6 @@ def _validate_required_numeric(df: pd.DataFrame, add_issue: _AddIssueFn) -> None
         df[col] = parsed
 
 
-def _validate_optional_numeric(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
-    """Parse optional legacy numeric columns while preserving blank cells as NaN."""
-    for col in NUMERIC_OPTIONAL:
-        if col not in df.columns:
-            continue
-        filled = df[col].map(is_filled)
-        parsed = pd.to_numeric(df[col].where(filled), errors="coerce")
-        invalid = filled & parsed.isna()
-        for idx in df.index[invalid]:
-            add_issue(int(idx), col, "must be numeric when specified.")
-        df[col] = parsed
-
-
 def _validate_positive_columns(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
     """Enforce strictly positive constraints for configured columns."""
     for col in POSITIVE_COLUMNS:
@@ -232,13 +213,6 @@ def _validate_flow_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
     invalid_gamma = df["gamma"] <= 1.0
     for idx in df.index[invalid_gamma]:
         add_issue(int(idx), "gamma", "must be > 1.")
-
-    for col in ("S", "Ti_K", "Tw_K"):
-        if col not in df.columns:
-            continue
-        invalid = df[col].notna() & (df[col] <= 0.0)
-        for idx in df.index[invalid]:
-            add_issue(int(idx), col, "must be > 0 when specified.")
 
 
 def _validate_flags(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
@@ -309,7 +283,6 @@ def _validate_and_normalize(df: pd.DataFrame, input_path: Path) -> pd.DataFrame:
     _validate_case_ids(df, add_issue)
     _validate_and_resolve_stl_paths(df, input_path, add_issue)
     _validate_required_numeric(df, add_issue)
-    _validate_optional_numeric(df, add_issue)
     _validate_positive_columns(df, add_issue)
     _validate_flow_inputs(df, add_issue)
     _validate_flags(df, add_issue)

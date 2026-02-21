@@ -1,1 +1,1 @@
-"""Physics models and atmosphere utilities."""
+"""Physics models."""

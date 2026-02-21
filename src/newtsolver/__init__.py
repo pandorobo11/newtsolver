@@ -1,3 +1,3 @@
-"""FMF solver package."""
+"""newtsolver package."""
 
 __all__ = []
