@@ -15,7 +15,7 @@ from typing import Callable, Iterator
 
 import pandas as pd
 
-from .sentman_core import resolve_attitude_to_vhat
+from .panel_core import resolve_attitude_to_vhat
 
 
 def resolve_parallel_chunk_cases() -> int:

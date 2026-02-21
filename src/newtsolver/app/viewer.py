@@ -9,7 +9,7 @@ import pyvista as pv
 from PySide6 import QtCore, QtWidgets
 from pyvistaqt import QtInteractor
 
-from ..core.sentman_core import resolve_attitude_to_vhat
+from ..core.panel_core import resolve_attitude_to_vhat
 from .ui_utils import format_case_text
 
 

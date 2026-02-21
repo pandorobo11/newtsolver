@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Case execution pipeline for FMF coefficient computation."""
+"""Case execution pipeline for panel coefficient computation."""
 
 import json
 import math
@@ -20,10 +20,10 @@ from ..physics.us1976 import mean_to_most_probable_speed, sample_at_altitude_km
 from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
-from .sentman_core import (
+from .panel_core import (
+    newtonian_dC_dA_vectors,
     resolve_attitude_to_vhat,
     rot_y,
-    sentman_dC_dA_vectors,
     stl_to_body,
 )
 from .shielding import compute_shield_mask_with_backend
@@ -172,12 +172,9 @@ def _compute_case_integrals(
     num_components: int,
 ) -> dict:
     """Compute per-face and integrated coefficients for one case."""
-    dC_dA_arr = sentman_dC_dA_vectors(
+    dC_dA_arr = newtonian_dC_dA_vectors(
         Vhat=Vhat,
         n_out=normals_out_stl,
-        S=S,
-        Ti=Ti,
-        Tw=Tw,
         Aref=Aref,
         shielded=shielded,
     )

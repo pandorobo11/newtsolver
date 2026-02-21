@@ -1,25 +1,12 @@
 from __future__ import annotations
 
-"""Sentman free-molecular-flow core equations and coordinate transforms."""
+"""Newtonian pressure model and coordinate transforms."""
 
 import math
 
 import numpy as np
-from scipy.special import erf
 
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-
-
-def _erf_scalar(x: float) -> float:
-    """Evaluate ``erf`` for one scalar."""
-    return float(erf(float(x)))
-
-
-def _erf_array(x: np.ndarray) -> np.ndarray:
-    """Evaluate ``erf`` element-wise for a float array."""
-    x = np.asarray(x, dtype=float)
-    return np.asarray(erf(x), dtype=float)
-
 
 def _resolve_attitude_mode(attitude_input: str | None) -> str:
     """Return canonical attitude mode with default and validation."""
@@ -130,34 +117,18 @@ def resolve_attitude_to_vhat(
     return vhat, alpha_t, beta_t, mode
 
 
-def sentman_dC_dA_vector(
+def newtonian_dC_dA_vector(
     Vhat: np.ndarray,
     n_out: np.ndarray,
-    S: float,
-    Ti: float,
-    Tw: float,
     Aref: float,
     shielded: bool = False,
+    cp_max: float = 2.0,
 ) -> np.ndarray:
-    """Compute panel force-coefficient density vector ``dC/dA``.
+    """Compute panel force-coefficient density vector ``dC/dA`` by Newtonian rule.
 
-    The implemented formula follows the codebase's Sentman convention:
-    ``dC/dA = (A*Vhat + (B + C)*n_in) / Aref``.
-
-    When ``shielded=True``, the panel contributes zero force and the function
-    returns a zero vector immediately.
-
-    Args:
-        Vhat: Freestream unit vector in STL axes, shape ``(3,)``.
-        n_out: Outward panel normal in STL axes, shape ``(3,)``.
-        S: Molecular speed ratio.
-        Ti: Free-stream translational temperature [K].
-        Tw: Wall temperature [K].
-        Aref: Reference area [m^2] for non-dimensionalization.
-        shielded: If true, skip force evaluation and return zero.
-
-    Returns:
-        Force-coefficient density vector in STL axes, shape ``(3,)``.
+    Windward face (``n_in·Vhat > 0``): ``Cp = cp_max * (n_in·Vhat)^2``.
+    Leeward face or shielded face: ``Cp = 0``.
+    Pressure force acts along ``-n_out``.
     """
     if shielded:
         return np.zeros(3, dtype=float)
@@ -166,47 +137,29 @@ def sentman_dC_dA_vector(
     n_out = np.asarray(n_out, dtype=float)
     n_in = -n_out
 
-    gamma = float(np.dot(Vhat, n_in))
+    gamma_n = float(np.dot(Vhat, n_in))
+    if gamma_n <= 0.0:
+        return np.zeros(3, dtype=float)
 
-    S = float(S)
-    if S <= 0:
-        raise ValueError(f"S must be > 0, got {S}")
-
-    hs = gamma * S
-    Phi = 1.0 + _erf_scalar(hs)
-    E = math.exp(-(hs * hs))
-
-    A = gamma * Phi + (1.0 / (S * math.sqrt(math.pi))) * E
-    B = (1.0 / (2.0 * S * S)) * Phi
-    C = (
-        0.5
-        * math.sqrt(float(Tw) / float(Ti))
-        * ((gamma * math.sqrt(math.pi) / S) * Phi + (1.0 / (S * S)) * E)
-    )
-
-    dC_dA = (A * Vhat + (B + C) * n_in) / float(Aref)
-    return dC_dA
+    cp = float(cp_max) * (gamma_n * gamma_n)
+    return -(cp / float(Aref)) * n_out
 
 
-def sentman_dC_dA_vectors(
+def newtonian_dC_dA_vectors(
     Vhat: np.ndarray,
     n_out: np.ndarray,
-    S: float,
-    Ti: float,
-    Tw: float,
     Aref: float,
     shielded: np.ndarray | bool = False,
+    cp_max: float = 2.0,
 ) -> np.ndarray:
-    """Compute ``dC/dA`` for multiple panels in one call.
+    """Compute Newtonian ``dC/dA`` for multiple panels in one call.
 
     Args:
         Vhat: Freestream unit vector in STL axes, shape ``(3,)``.
         n_out: Outward panel normals in STL axes, shape ``(N, 3)``.
-        S: Molecular speed ratio.
-        Ti: Free-stream translational temperature [K].
-        Tw: Wall temperature [K].
         Aref: Reference area [m^2] for non-dimensionalization.
         shielded: Shield mask. Scalar bool or bool array of shape ``(N,)``.
+        cp_max: Newtonian maximum pressure coefficient.
 
     Returns:
         Force-coefficient density vectors in STL axes, shape ``(N, 3)``.
@@ -216,10 +169,6 @@ def sentman_dC_dA_vectors(
     n_out = np.asarray(n_out, dtype=float)
     if n_out.ndim != 2 or n_out.shape[1] != 3:
         raise ValueError("n_out must have shape (N, 3).")
-
-    S = float(S)
-    if S <= 0:
-        raise ValueError(f"S must be > 0, got {S}")
 
     n_faces = int(n_out.shape[0])
     out = np.zeros((n_faces, 3), dtype=float)
@@ -238,23 +187,42 @@ def sentman_dC_dA_vectors(
         return out
 
     n_in = -n_out[active]
-    gamma = n_in @ Vhat
-    hs = gamma * S
-    Phi = 1.0 + _erf_array(hs)
-    E = np.exp(-(hs * hs))
-
-    inv_S = 1.0 / S
-    inv_S2 = inv_S * inv_S
-    sqrt_pi = math.sqrt(math.pi)
-    sqrt_TwTi = math.sqrt(float(Tw) / float(Ti))
-
-    A = gamma * Phi + (inv_S / sqrt_pi) * E
-    B = 0.5 * inv_S2 * Phi
-    C = 0.5 * sqrt_TwTi * ((gamma * sqrt_pi * inv_S) * Phi + inv_S2 * E)
-
-    out_active = (A[:, None] * Vhat[None, :] + (B + C)[:, None] * n_in) / float(Aref)
-    out[active] = out_active
+    gamma_n = n_in @ Vhat
+    windward = gamma_n > 0.0
+    if np.any(windward):
+        cp = float(cp_max) * np.square(gamma_n[windward])
+        out_active = np.zeros_like(n_in)
+        out_active[windward] = -(cp[:, None] / float(Aref)) * n_out[active][windward]
+        out[active] = out_active
     return out
+
+
+def sentman_dC_dA_vector(
+    Vhat: np.ndarray,
+    n_out: np.ndarray,
+    S: float,
+    Ti: float,
+    Tw: float,
+    Aref: float,
+    shielded: bool = False,
+) -> np.ndarray:
+    """Backward-compatible alias for the Newtonian panel model."""
+    _ = (S, Ti, Tw)
+    return newtonian_dC_dA_vector(Vhat=Vhat, n_out=n_out, Aref=Aref, shielded=shielded)
+
+
+def sentman_dC_dA_vectors(
+    Vhat: np.ndarray,
+    n_out: np.ndarray,
+    S: float,
+    Ti: float,
+    Tw: float,
+    Aref: float,
+    shielded: np.ndarray | bool = False,
+) -> np.ndarray:
+    """Backward-compatible alias for the Newtonian panel model."""
+    _ = (S, Ti, Tw)
+    return newtonian_dC_dA_vectors(Vhat=Vhat, n_out=n_out, Aref=Aref, shielded=shielded)
 
 
 def stl_to_body(v_stl: np.ndarray) -> np.ndarray:
