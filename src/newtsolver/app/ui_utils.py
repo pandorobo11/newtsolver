@@ -35,6 +35,8 @@ def format_case_text(row: dict) -> str:
     ).strip() not in ("", "nan", "None"):
         add("Mach", row.get("Mach"))
         add("gamma", row.get("gamma"))
+    add("w_eq", row.get("windward_eq"))
+    add("l_eq", row.get("leeward_eq"))
 
     alpha_in = _as_float(row.get("alpha_deg"))
     beta_in = _as_float(row.get("beta_or_bank_deg"))

@@ -37,6 +37,8 @@ INPUT_COLUMN_ORDER = [
     # 3) flow condition
     "Mach",
     "gamma",
+    "windward_eq",
+    "leeward_eq",
     # 4) attitude
     "alpha_deg",
     "beta_or_bank_deg",
@@ -86,6 +88,8 @@ POSITIVE_COLUMNS = {
 FLAG_COLUMNS = ["shielding_on", "save_vtp_on", "save_npz_on"]
 RAY_BACKEND_VALUES = {"auto", "rtree", "embree"}
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "shield"}
+LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror"}
 
 DEFAULTS = {
     "shielding_on": 0,
@@ -93,6 +97,8 @@ DEFAULTS = {
     "save_npz_on": 0,
     "ray_backend": "auto",
     "attitude_input": "beta_tan",
+    "windward_eq": "newtonian",
+    "leeward_eq": "shield",
     "out_dir": "outputs",
 }
 
@@ -101,6 +107,22 @@ def _normalize_attitude_input(value) -> str:
     raw = str(value or "").strip().lower()
     if not raw:
         return "beta_tan"
+    return raw
+
+
+def _normalize_windward_eq(value) -> str:
+    """Normalize windward equation selector to canonical keyword."""
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return "newtonian"
+    return raw
+
+
+def _normalize_leeward_eq(value) -> str:
+    """Normalize leeward equation selector to canonical keyword."""
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return "shield"
     return raw
 
 
@@ -253,6 +275,27 @@ def _validate_attitude_input(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
         )
 
 
+def _validate_surface_equations(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
+    """Normalize and validate windward/leeward pressure-equation selectors."""
+    df["windward_eq"] = df["windward_eq"].map(_normalize_windward_eq)
+    invalid_windward = ~df["windward_eq"].isin(WINDWARD_EQUATION_VALUES)
+    for idx in df.index[invalid_windward]:
+        add_issue(
+            int(idx),
+            "windward_eq",
+            "must be one of: newtonian, shield.",
+        )
+
+    df["leeward_eq"] = df["leeward_eq"].map(_normalize_leeward_eq)
+    invalid_leeward = ~df["leeward_eq"].isin(LEEWARD_EQUATION_VALUES)
+    for idx in df.index[invalid_leeward]:
+        add_issue(
+            int(idx),
+            "leeward_eq",
+            "must be one of: shield, newtonian_mirror.",
+        )
+
+
 def _validate_out_dir(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
     """Validate output directory strings."""
     df["out_dir"] = df["out_dir"].astype(str).str.strip()
@@ -288,6 +331,7 @@ def _validate_and_normalize(df: pd.DataFrame, input_path: Path) -> pd.DataFrame:
     _validate_flags(df, add_issue)
     _validate_ray_backend(df, add_issue)
     _validate_attitude_input(df, add_issue)
+    _validate_surface_equations(df, add_issue)
     _validate_out_dir(df, add_issue)
 
     if issues:

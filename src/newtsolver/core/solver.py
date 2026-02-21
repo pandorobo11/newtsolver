@@ -119,6 +119,8 @@ def _compute_case_integrals(
     Lref_Cn: float,
     shielded: np.ndarray,
     num_components: int,
+    windward_eq: str,
+    leeward_eq: str,
 ) -> dict:
     """Compute per-face and integrated coefficients for one case."""
     dC_dA_arr = newtonian_dC_dA_vectors(
@@ -126,6 +128,8 @@ def _compute_case_integrals(
         n_out=normals_out_stl,
         Aref=Aref,
         shielded=shielded,
+        windward_eq=windward_eq,
+        leeward_eq=leeward_eq,
     )
 
     C_face_stl = dC_dA_arr * areas[:, None]
@@ -258,6 +262,8 @@ def _export_case_artifacts(
     Cn: float,
     CD: float,
     CL: float,
+    windward_eq: str,
+    leeward_eq: str,
 ) -> tuple[str, str]:
     """Write optional VTP/NPZ artifacts and return output paths."""
     if save_vtp:
@@ -285,6 +291,8 @@ def _export_case_artifacts(
                 "stl_count": int(num_components),
                 "ray_backend_used": ray_backend_used,
                 "attitude_input_used": attitude_mode,
+                "windward_eq_used": windward_eq,
+                "leeward_eq_used": leeward_eq,
                 "alpha_t_deg_resolved": float(alpha_t_deg),
                 "beta_t_deg_resolved": float(beta_t_deg),
                 "stl_paths_json": json.dumps(list(stl_paths_order), ensure_ascii=True),
@@ -402,6 +410,8 @@ def run_case(row: dict, logfn) -> dict:
     save_npz = bool(int(row.get("save_npz_on", 0)))
     out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
+    windward_eq = str(row.get("windward_eq", "newtonian"))
+    leeward_eq = str(row.get("leeward_eq", "shield"))
 
     _validate_mach_gamma(row)
     signature = build_case_signature(row)
@@ -447,6 +457,8 @@ def run_case(row: dict, logfn) -> dict:
         Lref_Cn=Lref_Cn,
         shielded=shielded,
         num_components=num_components,
+        windward_eq=windward_eq,
+        leeward_eq=leeward_eq,
     )
 
     C_face_stl = calc["C_face_stl"]
@@ -523,6 +535,8 @@ def run_case(row: dict, logfn) -> dict:
         Cn=Cn,
         CD=CD,
         CL=CL,
+        windward_eq=windward_eq,
+        leeward_eq=leeward_eq,
     )
 
     finished_at_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

@@ -48,6 +48,8 @@ class TestIoCasesValidation(unittest.TestCase):
             self.assertEqual(int(loaded.loc[0, "shielding_on"]), 0)
             self.assertEqual(str(loaded.loc[0, "ray_backend"]), "auto")
             self.assertEqual(str(loaded.loc[0, "attitude_input"]), "beta_tan")
+            self.assertEqual(str(loaded.loc[0, "windward_eq"]), "newtonian")
+            self.assertEqual(str(loaded.loc[0, "leeward_eq"]), "shield")
             self.assertEqual(str(loaded.loc[0, "stl_path"]), str(stl_path.resolve()))
             self.assertEqual(
                 list(loaded.columns),
@@ -157,6 +159,26 @@ class TestIoCasesValidation(unittest.TestCase):
             row_att_bad["attitude_input"] = "not_supported"
             pd.DataFrame([row_att_bad]).to_csv(csv_path, index=False)
             with self.assertRaisesRegex(InputValidationError, "attitude_input"):
+                read_cases(str(csv_path))
+
+            row_eq = self._base_row("mesh.stl")
+            row_eq["windward_eq"] = "shield"
+            row_eq["leeward_eq"] = "newtonian_mirror"
+            pd.DataFrame([row_eq]).to_csv(csv_path, index=False)
+            loaded = read_cases(str(csv_path))
+            self.assertEqual(str(loaded.loc[0, "windward_eq"]), "shield")
+            self.assertEqual(str(loaded.loc[0, "leeward_eq"]), "newtonian_mirror")
+
+            row_eq_bad = self._base_row("mesh.stl")
+            row_eq_bad["windward_eq"] = "invalid_windward"
+            pd.DataFrame([row_eq_bad]).to_csv(csv_path, index=False)
+            with self.assertRaisesRegex(InputValidationError, "windward_eq"):
+                read_cases(str(csv_path))
+
+            row_eq_bad2 = self._base_row("mesh.stl")
+            row_eq_bad2["leeward_eq"] = "invalid_leeward"
+            pd.DataFrame([row_eq_bad2]).to_csv(csv_path, index=False)
+            with self.assertRaisesRegex(InputValidationError, "leeward_eq"):
                 read_cases(str(csv_path))
 
     def test_read_cases_exposes_structured_issues(self):

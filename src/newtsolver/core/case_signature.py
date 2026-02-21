@@ -19,6 +19,8 @@ def build_case_signature(row: dict) -> str:
         "stl_scale_m_per_unit",
         "Mach",
         "gamma",
+        "windward_eq",
+        "leeward_eq",
         "alpha_deg",
         "beta_or_bank_deg",
         "attitude_input",

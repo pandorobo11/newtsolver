@@ -7,6 +7,8 @@ import math
 import numpy as np
 
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "shield"}
+LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror"}
 
 def _resolve_attitude_mode(attitude_input: str | None) -> str:
     """Return canonical attitude mode with default and validation."""
@@ -17,6 +19,28 @@ def _resolve_attitude_mode(attitude_input: str | None) -> str:
             "Expected one of: beta_tan, beta_sin, bank."
         )
     return mode
+
+
+def _resolve_windward_equation(value: str | None) -> str:
+    """Normalize windward equation selector to canonical keyword."""
+    eq = str(value or "").strip().lower() or "newtonian"
+    if eq not in WINDWARD_EQUATION_VALUES:
+        raise ValueError(
+            f"Invalid windward_eq: '{value}'. "
+            "Expected one of: newtonian, shield."
+        )
+    return eq
+
+
+def _resolve_leeward_equation(value: str | None) -> str:
+    """Normalize leeward equation selector to canonical keyword."""
+    eq = str(value or "").strip().lower() or "shield"
+    if eq not in LEEWARD_EQUATION_VALUES:
+        raise ValueError(
+            f"Invalid leeward_eq: '{value}'. "
+            "Expected one of: shield, newtonian_mirror."
+        )
+    return eq
 
 
 def _resolve_attitude_beta_tan(alpha_in: float, beta_in: float) -> tuple[np.ndarray, float, float]:
@@ -123,6 +147,8 @@ def newtonian_dC_dA_vector(
     Aref: float,
     shielded: bool = False,
     cp_max: float = 2.0,
+    windward_eq: str = "newtonian",
+    leeward_eq: str = "shield",
 ) -> np.ndarray:
     """Compute panel force-coefficient density vector ``dC/dA`` by Newtonian rule.
 
@@ -137,11 +163,19 @@ def newtonian_dC_dA_vector(
     n_out = np.asarray(n_out, dtype=float)
     n_in = -n_out
 
+    windward_eq = _resolve_windward_equation(windward_eq)
+    leeward_eq = _resolve_leeward_equation(leeward_eq)
     gamma_n = float(np.dot(Vhat, n_in))
-    if gamma_n <= 0.0:
-        return np.zeros(3, dtype=float)
 
-    cp = float(cp_max) * (gamma_n * gamma_n)
+    if gamma_n > 0.0:
+        if windward_eq == "shield":
+            return np.zeros(3, dtype=float)
+        cp = float(cp_max) * (gamma_n * gamma_n)
+    else:
+        if leeward_eq == "shield":
+            return np.zeros(3, dtype=float)
+        cp = float(cp_max) * (gamma_n * gamma_n)
+
     return -(cp / float(Aref)) * n_out
 
 
@@ -151,6 +185,8 @@ def newtonian_dC_dA_vectors(
     Aref: float,
     shielded: np.ndarray | bool = False,
     cp_max: float = 2.0,
+    windward_eq: str = "newtonian",
+    leeward_eq: str = "shield",
 ) -> np.ndarray:
     """Compute Newtonian ``dC/dA`` for multiple panels in one call.
 
@@ -186,14 +222,22 @@ def newtonian_dC_dA_vectors(
     if not np.any(active):
         return out
 
+    windward_eq = _resolve_windward_equation(windward_eq)
+    leeward_eq = _resolve_leeward_equation(leeward_eq)
     n_in = -n_out[active]
     gamma_n = n_in @ Vhat
     windward = gamma_n > 0.0
-    if np.any(windward):
-        cp = float(cp_max) * np.square(gamma_n[windward])
-        out_active = np.zeros_like(n_in)
-        out_active[windward] = -(cp[:, None] / float(Aref)) * n_out[active][windward]
-        out[active] = out_active
+    cp = np.zeros_like(gamma_n)
+    if windward_eq == "newtonian":
+        cp[windward] = float(cp_max) * np.square(gamma_n[windward])
+    if leeward_eq == "newtonian_mirror":
+        cp[~windward] = float(cp_max) * np.square(gamma_n[~windward])
+
+    out_active = np.zeros_like(n_in)
+    nonzero = cp > 0.0
+    if np.any(nonzero):
+        out_active[nonzero] = -(cp[nonzero, None] / float(Aref)) * n_out[active][nonzero]
+    out[active] = out_active
     return out
 
 def stl_to_body(v_stl: np.ndarray) -> np.ndarray:

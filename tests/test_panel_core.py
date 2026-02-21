@@ -46,6 +46,26 @@ class TestPanelCore(unittest.TestCase):
         )
         np.testing.assert_allclose(v, np.zeros(3), rtol=0.0, atol=0.0)
 
+    def test_leeward_newtonian_mirror_can_generate_force(self):
+        v = newtonian_dC_dA_vector(
+            Vhat=np.array([1.0, 0.0, 0.0]),
+            n_out=np.array([1.0, 0.0, 0.0]),
+            Aref=1.0,
+            shielded=False,
+            leeward_eq="newtonian_mirror",
+        )
+        np.testing.assert_allclose(v, np.array([-2.0, 0.0, 0.0]), rtol=0.0, atol=1e-12)
+
+    def test_windward_shield_zeroes_force(self):
+        v = newtonian_dC_dA_vector(
+            Vhat=np.array([1.0, 0.0, 0.0]),
+            n_out=np.array([-1.0, 0.0, 0.0]),
+            Aref=1.0,
+            shielded=False,
+            windward_eq="shield",
+        )
+        np.testing.assert_allclose(v, np.zeros(3), rtol=0.0, atol=0.0)
+
     def test_stl_to_body_axis_mapping(self):
         v_stl = np.array([2.0, -3.0, 4.5], dtype=float)
         v_body = stl_to_body(v_stl)
