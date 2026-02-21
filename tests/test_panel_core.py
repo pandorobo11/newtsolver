@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 
 from newtsolver.core.panel_core import (
+    modified_newtonian_cp_max,
     newtonian_dC_dA_vector,
     newtonian_dC_dA_vectors,
     resolve_attitude_to_vhat,
@@ -65,6 +66,24 @@ class TestPanelCore(unittest.TestCase):
             windward_eq="shield",
         )
         np.testing.assert_allclose(v, np.zeros(3), rtol=0.0, atol=0.0)
+
+    def test_modified_newtonian_cp_max_is_finite(self):
+        cp_max = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
+        self.assertTrue(math.isfinite(cp_max))
+        self.assertGreater(cp_max, 0.0)
+        self.assertLess(cp_max, 2.0)
+
+    def test_modified_newtonian_windward_uses_given_cp_max(self):
+        cp_max = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
+        v = newtonian_dC_dA_vector(
+            Vhat=np.array([1.0, 0.0, 0.0]),
+            n_out=np.array([-1.0, 0.0, 0.0]),
+            Aref=1.0,
+            shielded=False,
+            cp_max=cp_max,
+            windward_eq="modified_newtonian",
+        )
+        np.testing.assert_allclose(v, np.array([cp_max, 0.0, 0.0]), rtol=0.0, atol=1e-12)
 
     def test_stl_to_body_axis_mapping(self):
         v_stl = np.array([2.0, -3.0, 4.5], dtype=float)

@@ -278,6 +278,43 @@ class TestSolverPipeline(unittest.TestCase):
             for key in ("CA", "CY", "CN", "Cl", "Cm", "Cn", "CD", "CL"):
                 self.assertTrue(math.isfinite(float(result[key])), key)
 
+    def test_run_case_modified_newtonian_changes_windward_magnitude(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
+            row_newtonian = {
+                "case_id": "test_case_newtonian",
+                "stl_path": "samples/stl/cube.stl",
+                "stl_scale_m_per_unit": 1.0,
+                "alpha_deg": 0.0,
+                "beta_or_bank_deg": 0.0,
+                "ref_x_m": 0.0,
+                "ref_y_m": 0.0,
+                "ref_z_m": 0.0,
+                "Aref_m2": 1.0,
+                "Lref_Cl_m": 1.0,
+                "Lref_Cm_m": 1.0,
+                "Lref_Cn_m": 1.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
+                "windward_eq": "newtonian",
+                "leeward_eq": "shield",
+                "shielding_on": 0,
+                "save_vtp_on": 0,
+                "save_npz_on": 0,
+                "out_dir": td,
+            }
+            row_modified = {
+                **row_newtonian,
+                "case_id": "test_case_modified_newtonian",
+                "windward_eq": "modified_newtonian",
+            }
+
+            result_n = run_case(row_newtonian, lambda _msg: None)
+            result_mn = run_case(row_modified, lambda _msg: None)
+
+            self.assertGreater(float(result_n["CA"]), 0.0)
+            self.assertGreater(float(result_mn["CA"]), 0.0)
+            self.assertLess(float(result_mn["CA"]), float(result_n["CA"]))
+
     def test_run_case_forwards_ray_backend_to_shielding(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {

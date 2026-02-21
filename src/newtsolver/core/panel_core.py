@@ -7,7 +7,7 @@ import math
 import numpy as np
 
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-WINDWARD_EQUATION_VALUES = {"newtonian", "shield"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "shield"}
 LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror"}
 
 def _resolve_attitude_mode(attitude_input: str | None) -> str:
@@ -27,7 +27,7 @@ def _resolve_windward_equation(value: str | None) -> str:
     if eq not in WINDWARD_EQUATION_VALUES:
         raise ValueError(
             f"Invalid windward_eq: '{value}'. "
-            "Expected one of: newtonian, shield."
+            "Expected one of: newtonian, modified_newtonian, shield."
         )
     return eq
 
@@ -41,6 +41,32 @@ def _resolve_leeward_equation(value: str | None) -> str:
             "Expected one of: shield, newtonian_mirror."
         )
     return eq
+
+
+def modified_newtonian_cp_max(Mach: float, gamma: float) -> float:
+    """Return Modified-Newtonian stagnation pressure coefficient ``Cp_max``.
+
+    ``Cp_max`` is computed from a normal-shock + isentropic recovery model:
+    ``Cp_max = 2/(gamma*M^2) * (p02/p1 - 1)``.
+    """
+    M1 = float(Mach)
+    g = float(gamma)
+    if M1 <= 1.0:
+        raise ValueError(f"modified_newtonian requires Mach > 1, got {M1}")
+    if g <= 1.0:
+        raise ValueError(f"gamma must be > 1, got {g}")
+
+    m1_sq = M1 * M1
+    p2_p1 = 1.0 + (2.0 * g / (g + 1.0)) * (m1_sq - 1.0)
+    m2_sq = (1.0 + 0.5 * (g - 1.0) * m1_sq) / (g * m1_sq - 0.5 * (g - 1.0))
+    if m2_sq <= 0.0:
+        raise ValueError(f"Invalid post-shock state for Mach={M1}, gamma={g}")
+    p02_p2 = (1.0 + 0.5 * (g - 1.0) * m2_sq) ** (g / (g - 1.0))
+    p02_p1 = p2_p1 * p02_p2
+    cp_max = (2.0 / (g * m1_sq)) * (p02_p1 - 1.0)
+    if not math.isfinite(cp_max) or cp_max < 0.0:
+        raise ValueError(f"Invalid Cp_max computed: {cp_max}")
+    return float(cp_max)
 
 
 def _resolve_attitude_beta_tan(alpha_in: float, beta_in: float) -> tuple[np.ndarray, float, float]:
@@ -228,7 +254,7 @@ def newtonian_dC_dA_vectors(
     gamma_n = n_in @ Vhat
     windward = gamma_n > 0.0
     cp = np.zeros_like(gamma_n)
-    if windward_eq == "newtonian":
+    if windward_eq in {"newtonian", "modified_newtonian"}:
         cp[windward] = float(cp_max) * np.square(gamma_n[windward])
     if leeward_eq == "newtonian_mirror":
         cp[~windward] = float(cp_max) * np.square(gamma_n[~windward])

@@ -88,7 +88,7 @@ POSITIVE_COLUMNS = {
 FLAG_COLUMNS = ["shielding_on", "save_vtp_on", "save_npz_on"]
 RAY_BACKEND_VALUES = {"auto", "rtree", "embree"}
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-WINDWARD_EQUATION_VALUES = {"newtonian", "shield"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "shield"}
 LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror"}
 
 DEFAULTS = {
@@ -235,6 +235,10 @@ def _validate_flow_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
     invalid_gamma = df["gamma"] <= 1.0
     for idx in df.index[invalid_gamma]:
         add_issue(int(idx), "gamma", "must be > 1.")
+    if "windward_eq" in df.columns:
+        invalid_modified = (df["windward_eq"] == "modified_newtonian") & (df["Mach"] <= 1.0)
+        for idx in df.index[invalid_modified]:
+            add_issue(int(idx), "Mach", "must be > 1 when windward_eq=modified_newtonian.")
 
 
 def _validate_flags(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
@@ -283,7 +287,7 @@ def _validate_surface_equations(df: pd.DataFrame, add_issue: _AddIssueFn) -> Non
         add_issue(
             int(idx),
             "windward_eq",
-            "must be one of: newtonian, shield.",
+            "must be one of: newtonian, modified_newtonian, shield.",
         )
 
     df["leeward_eq"] = df["leeward_eq"].map(_normalize_leeward_eq)
@@ -327,11 +331,11 @@ def _validate_and_normalize(df: pd.DataFrame, input_path: Path) -> pd.DataFrame:
     _validate_and_resolve_stl_paths(df, input_path, add_issue)
     _validate_required_numeric(df, add_issue)
     _validate_positive_columns(df, add_issue)
+    _validate_surface_equations(df, add_issue)
     _validate_flow_inputs(df, add_issue)
     _validate_flags(df, add_issue)
     _validate_ray_backend(df, add_issue)
     _validate_attitude_input(df, add_issue)
-    _validate_surface_equations(df, add_issue)
     _validate_out_dir(df, add_issue)
 
     if issues:

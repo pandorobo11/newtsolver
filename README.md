@@ -82,7 +82,7 @@ Supported formats:
 | `stl_scale_m_per_unit` | Yes | float | m per STL unit | Scale factor applied to STL coordinates. Example: STL in mm -> `0.001`. |
 | `Mach` | Yes | float | Mach number | Freestream Mach number. Must be > 0. |
 | `gamma` | Yes | float | - | Ratio of specific heats. Must be > 1. |
-| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default) or `shield` (`Cp=0`). |
+| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, or `shield` (`Cp=0`). |
 | `leeward_eq` | No | string | Leeward pressure equation | `shield` (default) or `newtonian_mirror`. |
 | `alpha_deg` | Yes | deg | 1st attitude angle | Meaning depends on `attitude_input`. |
 | `beta_or_bank_deg` | Yes | deg | 2nd attitude angle | `beta` for `beta_tan`/`beta_sin`, `bank angle (phi)` for `bank`. |
@@ -108,6 +108,7 @@ Flow input rules:
 
 - `windward_eq`
   - `newtonian` (default): `Cp = 2 * (n_in·Vhat)^2` on windward faces.
+  - `modified_newtonian`: `Cp = Cp_max(Mach, gamma) * (n_in·Vhat)^2` on windward faces.
   - `shield`: windward contribution is forced to `Cp = 0`.
 - `leeward_eq`
   - `shield` (default): leeward contribution is forced to `Cp = 0`.

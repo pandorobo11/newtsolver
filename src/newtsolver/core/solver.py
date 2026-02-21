@@ -19,6 +19,7 @@ from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
 from .panel_core import (
+    modified_newtonian_cp_max,
     newtonian_dC_dA_vectors,
     resolve_attitude_to_vhat,
     rot_y,
@@ -121,6 +122,7 @@ def _compute_case_integrals(
     num_components: int,
     windward_eq: str,
     leeward_eq: str,
+    cp_max: float,
 ) -> dict:
     """Compute per-face and integrated coefficients for one case."""
     dC_dA_arr = newtonian_dC_dA_vectors(
@@ -128,6 +130,7 @@ def _compute_case_integrals(
         n_out=normals_out_stl,
         Aref=Aref,
         shielded=shielded,
+        cp_max=cp_max,
         windward_eq=windward_eq,
         leeward_eq=leeward_eq,
     )
@@ -410,10 +413,15 @@ def run_case(row: dict, logfn) -> dict:
     save_npz = bool(int(row.get("save_npz_on", 0)))
     out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
-    windward_eq = str(row.get("windward_eq", "newtonian"))
-    leeward_eq = str(row.get("leeward_eq", "shield"))
+    windward_eq = str(row.get("windward_eq", "newtonian")).strip().lower() or "newtonian"
+    leeward_eq = str(row.get("leeward_eq", "shield")).strip().lower() or "shield"
 
-    _validate_mach_gamma(row)
+    Mach, gamma = _validate_mach_gamma(row)
+    cp_max = (
+        modified_newtonian_cp_max(Mach=Mach, gamma=gamma)
+        if windward_eq == "modified_newtonian"
+        else 2.0
+    )
     signature = build_case_signature(row)
 
     Vhat, alpha_t_deg, beta_t_deg, attitude_mode = resolve_attitude_to_vhat(
@@ -459,6 +467,7 @@ def run_case(row: dict, logfn) -> dict:
         num_components=num_components,
         windward_eq=windward_eq,
         leeward_eq=leeward_eq,
+        cp_max=cp_max,
     )
 
     C_face_stl = calc["C_face_stl"]
