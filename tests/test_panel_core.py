@@ -6,6 +6,8 @@ import unittest
 import numpy as np
 
 from newtsolver.core.panel_core import (
+    _inverse_prandtl_meyer,
+    _prandtl_meyer_nu,
     modified_newtonian_cp_max,
     newtonian_dC_dA_vector,
     newtonian_dC_dA_vectors,
@@ -104,6 +106,13 @@ class TestPanelCore(unittest.TestCase):
         )
         self.assertGreater(float(v[0]), 0.0)
         self.assertLess(float(v[0]), 2.0)
+
+    def test_inverse_prandtl_meyer_regression_no_low_nu_oscillation(self):
+        gamma = 1.67
+        m_true = np.array([1.0571513513513513], dtype=float)
+        nu = _prandtl_meyer_nu(m_true, gamma)
+        m_est = _inverse_prandtl_meyer(nu, gamma)
+        self.assertAlmostEqual(float(m_est[0]), float(m_true[0]), places=9)
 
     def test_stl_to_body_axis_mapping(self):
         v_stl = np.array([2.0, -3.0, 4.5], dtype=float)
