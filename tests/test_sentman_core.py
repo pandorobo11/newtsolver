@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from fmfsolver.core.sentman_core import (
+from newtsolver.core.sentman_core import (
     resolve_attitude_to_vhat,
     sentman_dC_dA_vector,
     sentman_dC_dA_vectors,

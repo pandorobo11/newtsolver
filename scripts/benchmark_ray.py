@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from fmfsolver.core.solver import run_cases
-from fmfsolver.io.csv_out import write_results_csv
-from fmfsolver.io.io_cases import read_cases
+from newtsolver.core.solver import run_cases
+from newtsolver.io.csv_out import write_results_csv
+from newtsolver.io.io_cases import read_cases
 
 
 def _parse_case_ids(values: list[str] | None) -> set[str] | None:
@@ -44,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser for benchmark runs."""
     parser = argparse.ArgumentParser(
         prog="benchmark_ray.py",
-        description="Measure elapsed time and peak memory while running fmfsolver cases.",
+        description="Measure elapsed time and peak memory while running newtsolver cases.",
     )
     parser.add_argument(
         "--input",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Cache-aware parallel scheduling helpers for case execution.
 
-This module exists to keep :mod:`fmfsolver.core.solver` focused on the
+This module exists to keep :mod:`newtsolver.core.solver` focused on the
 physics/IO pipeline while isolating multiprocessing + scheduling policy.
 """
 
@@ -20,15 +20,24 @@ from .sentman_core import resolve_attitude_to_vhat
 
 def resolve_parallel_chunk_cases() -> int:
     """Return default per-task case chunk size for parallel scheduling."""
-    raw = os.getenv("FMFSOLVER_PARALLEL_CHUNK_CASES", "").strip()
+    raw = os.getenv("NEWTSOLVER_PARALLEL_CHUNK_CASES", "").strip()
+    if not raw:
+        # Backward-compatible alias while migrating from fmfsolver -> newtsolver.
+        raw = os.getenv("FMFSOLVER_PARALLEL_CHUNK_CASES", "").strip()
     if not raw:
         return 8
     try:
         value = int(raw)
     except ValueError as exc:
-        raise ValueError("FMFSOLVER_PARALLEL_CHUNK_CASES must be an integer >= 1.") from exc
+        raise ValueError(
+            "NEWTSOLVER_PARALLEL_CHUNK_CASES (or FMFSOLVER_PARALLEL_CHUNK_CASES) "
+            "must be an integer >= 1."
+        ) from exc
     if value < 1:
-        raise ValueError("FMFSOLVER_PARALLEL_CHUNK_CASES must be >= 1.")
+        raise ValueError(
+            "NEWTSOLVER_PARALLEL_CHUNK_CASES (or FMFSOLVER_PARALLEL_CHUNK_CASES) "
+            "must be >= 1."
+        )
     return value
 
 

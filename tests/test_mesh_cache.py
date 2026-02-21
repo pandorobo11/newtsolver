@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from fmfsolver.core.mesh_utils import clear_mesh_cache, load_meshes, mesh_cache_stats
+from newtsolver.core.mesh_utils import clear_mesh_cache, load_meshes, mesh_cache_stats
 
 
 class TestMeshCache(unittest.TestCase):

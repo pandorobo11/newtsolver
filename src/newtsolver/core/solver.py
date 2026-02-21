@@ -29,7 +29,7 @@ from .sentman_core import (
 from .shielding import compute_shield_mask_with_backend
 
 try:
-    SOLVER_VERSION = version("fmfsolver")
+    SOLVER_VERSION = version("newtsolver")
 except PackageNotFoundError:
     SOLVER_VERSION = "dev"
 
@@ -48,7 +48,7 @@ def _maybe_log_ray_accel_hint(logfn) -> None:
         logfn(
             "[INFO] Ray backend: rtree (ray_triangle). Optional acceleration is "
             "available: uv sync --extra rayaccel (or pip install "
-            "\"fmfsolver[rayaccel]\")."
+            "\"newtsolver[rayaccel]\")."
         )
     _RAY_ACCEL_HINT_SHOWN = True
 

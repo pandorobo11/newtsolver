@@ -22,15 +22,23 @@ _INTERSECTOR_CACHE: OrderedDict[tuple, object] = OrderedDict()
 
 def _resolve_shield_cache_max() -> int:
     """Return max number of cached shield masks kept in this process."""
-    raw = os.getenv("FMFSOLVER_SHIELD_CACHE_MAX", "").strip()
+    raw = os.getenv("NEWTSOLVER_SHIELD_CACHE_MAX", "").strip()
+    if not raw:
+        # Backward-compatible alias while migrating from fmfsolver -> newtsolver.
+        raw = os.getenv("FMFSOLVER_SHIELD_CACHE_MAX", "").strip()
     if not raw:
         return 1
     try:
         value = int(raw)
     except ValueError as exc:
-        raise ValueError("FMFSOLVER_SHIELD_CACHE_MAX must be an integer >= 0.") from exc
+        raise ValueError(
+            "NEWTSOLVER_SHIELD_CACHE_MAX (or FMFSOLVER_SHIELD_CACHE_MAX) "
+            "must be an integer >= 0."
+        ) from exc
     if value < 0:
-        raise ValueError("FMFSOLVER_SHIELD_CACHE_MAX must be >= 0.")
+        raise ValueError(
+            "NEWTSOLVER_SHIELD_CACHE_MAX (or FMFSOLVER_SHIELD_CACHE_MAX) must be >= 0."
+        )
     return value
 
 
@@ -90,12 +98,18 @@ def _resolve_intersector(mesh: trimesh.Trimesh, ray_backend: str) -> tuple[objec
 def _resolve_batch_size(ray_backend_resolved: str, batch_size: int | None) -> int:
     """Resolve shielding ray batch size from argument, env, or backend."""
     if batch_size is None:
-        raw = os.getenv("FMFSOLVER_SHIELD_BATCH_SIZE", "").strip()
+        raw = os.getenv("NEWTSOLVER_SHIELD_BATCH_SIZE", "").strip()
+        if not raw:
+            # Backward-compatible alias while migrating from fmfsolver -> newtsolver.
+            raw = os.getenv("FMFSOLVER_SHIELD_BATCH_SIZE", "").strip()
         if raw:
             try:
                 batch_size = int(raw)
             except ValueError as exc:
-                raise ValueError("FMFSOLVER_SHIELD_BATCH_SIZE must be an integer >= 1.") from exc
+                raise ValueError(
+                    "NEWTSOLVER_SHIELD_BATCH_SIZE (or FMFSOLVER_SHIELD_BATCH_SIZE) "
+                    "must be an integer >= 1."
+                ) from exc
         else:
             batch_size = _default_batch_size(ray_backend_resolved)
     if batch_size < 1:
@@ -142,8 +156,10 @@ def compute_shield_mask(
         centers_m: Face centers [m], shape ``(n_faces, 3)``.
         Vhat: Freestream direction vector in STL coordinates, shape ``(3,)``.
         batch_size: Number of rays processed per query batch. If omitted,
-            uses ``FMFSOLVER_SHIELD_BATCH_SIZE`` when set, else backend-aware
-            defaults (Embree: ``64``, rtree: ``8``).
+            uses ``NEWTSOLVER_SHIELD_BATCH_SIZE`` when set, else backend-aware
+            defaults. Legacy alias ``FMFSOLVER_SHIELD_BATCH_SIZE`` is also
+            accepted.
+            Defaults: Embree ``64``, rtree ``8``.
         ray_backend: Ray intersector backend selector.
             - ``auto``: use trimesh default backend.
             - ``rtree``: force triangle intersector.

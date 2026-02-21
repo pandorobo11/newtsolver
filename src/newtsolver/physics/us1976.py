@@ -16,7 +16,7 @@ _US1976_TABLE2: pd.DataFrame | None = None
 def _data_path(filename: str):
     """Return package data path/traversable for a bundled US1976 CSV file."""
     try:
-        return resources.files("fmfsolver").joinpath("data", filename)
+        return resources.files("newtsolver").joinpath("data", filename)
     except Exception:
         return Path(__file__).resolve().parent / "data" / filename
 

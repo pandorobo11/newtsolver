@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-from fmfsolver.core.solver import run_case
+from newtsolver.core.solver import run_case
 
 
 def _sentman_flat_plate_cn_ca(
@@ -76,7 +76,7 @@ class TestFlatPlateVerification(unittest.TestCase):
         Tr_over_Ti = 1.0
         tol = 1e-10
 
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_flat_plate_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_flat_plate_") as td:
             stl_path = Path(td) / "one_sided_plate.stl"
             area_m2 = _write_one_sided_plate(stl_path)
 

@@ -1,6 +1,6 @@
 # Release Guide
 
-This file defines the release operation for `fmfsolver`.
+This file defines the release operation for `newtsolver`.
 
 ## Policy
 

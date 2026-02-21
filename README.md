@@ -1,4 +1,4 @@
-# fmfsolver
+# newtsolver
 
 Sentman free-molecular-flow (FMF) panel solver for STL geometry.
 
@@ -41,9 +41,9 @@ ray queries; otherwise the solver continues with the default `rtree` backend.
 
 ### GUI
 ```bash
-uv run fmfsolver
+uv run newtsolver
 ```
-(`uv run fmfsolver-gui` is also available.)
+(`uv run newtsolver-gui` is also available.)
 
 1. Click `Select Input File` and choose `.csv` or `.xlsx`.
 2. Select cases in the table (or leave unselected to run all).
@@ -53,12 +53,12 @@ uv run fmfsolver
 
 ### CLI
 ```bash
-uv run fmfsolver-cli --input samples/input_template.csv
+uv run newtsolver-cli --input samples/input_template.csv
 ```
 
 Example with options:
 ```bash
-uv run fmfsolver-cli \
+uv run newtsolver-cli \
   --input samples/input_template.csv \
   --workers 4 \
   --output outputs/result.csv \
@@ -178,7 +178,7 @@ Behavior note:
 
 Basic syntax:
 ```bash
-uv run fmfsolver-cli --input <input.csv or input.xlsx> [options]
+uv run newtsolver-cli --input <input.csv or input.xlsx> [options]
 ```
 
 Options:
@@ -190,13 +190,13 @@ Options:
 Examples:
 ```bash
 # Run all cases with default output
-uv run fmfsolver-cli --input samples/input_template.csv
+uv run newtsolver-cli --input samples/input_template.csv
 
 # Run selected cases with 4 workers
-uv run fmfsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cube_modeA baseline_double_plate_shield_on
+uv run newtsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cube_modeA baseline_double_plate_shield_on
 
 # Specify output path
-uv run fmfsolver-cli --input samples/input_template.csv -o outputs/custom_result.csv
+uv run newtsolver-cli --input samples/input_template.csv -o outputs/custom_result.csv
 ```
 
 ## Benchmark (Ray Casting)

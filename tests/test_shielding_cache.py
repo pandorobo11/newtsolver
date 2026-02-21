@@ -6,8 +6,8 @@ from unittest.mock import patch
 import numpy as np
 import trimesh
 
-import fmfsolver.core.shielding as shielding
-from fmfsolver.core.shielding import clear_shield_cache, compute_shield_mask
+import newtsolver.core.shielding as shielding
+from newtsolver.core.shielding import clear_shield_cache, compute_shield_mask
 
 
 class TestShieldingCache(unittest.TestCase):

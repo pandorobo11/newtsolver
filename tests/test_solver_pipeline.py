@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 import pyvista as pv
 
-from fmfsolver.core.solver import _build_execution_order, build_case_signature, run_case, run_cases
-from fmfsolver.io.csv_out import append_results_csv, write_results_csv
+from newtsolver.core.solver import _build_execution_order, build_case_signature, run_case, run_cases
+from newtsolver.io.csv_out import append_results_csv, write_results_csv
 
 
 class TestSolverPipeline(unittest.TestCase):
@@ -57,7 +57,7 @@ class TestSolverPipeline(unittest.TestCase):
         self.assertEqual(ordered_ids, ["on_a1", "on_a2", "on_b", "off_1"])
 
     def test_run_cases_returns_rows_in_input_order_even_if_execution_reordered(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -110,7 +110,7 @@ class TestSolverPipeline(unittest.TestCase):
 
     def test_run_cases_parallel_smoke(self):
         """Parallel path should execute and preserve input ordering."""
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -213,7 +213,7 @@ class TestSolverPipeline(unittest.TestCase):
         self.assertEqual(build_case_signature(row_int), build_case_signature(row_float))
 
     def test_run_case_mode_a_smoke(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
                 "case_id": "test_mode_a",
                 "stl_path": "samples/stl/cube.stl",
@@ -252,7 +252,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertTrue(Path(td).exists())
 
     def test_run_case_mode_b_smoke(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
                 "case_id": "test_mode_b",
                 "stl_path": "samples/stl/plate.stl",
@@ -290,7 +290,7 @@ class TestSolverPipeline(unittest.TestCase):
                 self.assertTrue(math.isfinite(float(result[key])), key)
 
     def test_run_case_forwards_ray_backend_to_shielding(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
                 "case_id": "test_ray_backend",
                 "stl_path": "samples/stl/cube.stl",
@@ -322,7 +322,7 @@ class TestSolverPipeline(unittest.TestCase):
                 return np.zeros(len(centers_m), dtype=bool), "rtree"
 
             with patch(
-                "fmfsolver.core.solver.compute_shield_mask_with_backend",
+                "newtsolver.core.solver.compute_shield_mask_with_backend",
                 side_effect=_zeros_mask,
             ) as mocked:
                 result = run_case(row, lambda _msg: None)
@@ -361,7 +361,7 @@ class TestSolverPipeline(unittest.TestCase):
             run_cases(df, lambda _msg: None, workers=1, cancel_cb=lambda: True)
 
     def test_run_cases_progress_callback(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -397,7 +397,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertEqual(ticks, [(1, 1)])
 
     def test_run_cases_chunk_callback(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -438,7 +438,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertEqual(chunks, [(2, 3, False, 2), (3, 3, True, 1)])
 
     def test_run_cases_multi_stl_emits_total_and_component_rows(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -486,7 +486,7 @@ class TestSolverPipeline(unittest.TestCase):
                 )
 
     def test_write_results_csv_keeps_component_rows(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -523,7 +523,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertEqual(int((out_df["scope"] == "component").sum()), 2)
 
     def test_append_results_csv_keeps_component_rows(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(
                 [
                     {
@@ -561,7 +561,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertEqual(int((out_df["scope"] == "component").sum()), 2)
 
     def test_write_results_csv_preserves_input_case_order(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df_in = pd.DataFrame(
                 [
                     {"case_id": "case_a", "stl_path": "samples/stl/cube.stl"},
@@ -585,7 +585,7 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertEqual(out_df["scope"].tolist(), ["total", "component", "total", "component"])
 
     def test_run_case_multi_stl_vtp_has_component_metadata(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
                 "case_id": "multi_case_vtp",
                 "stl_path": "samples/stl/cube.stl;samples/stl/plate_offset_x2.stl",

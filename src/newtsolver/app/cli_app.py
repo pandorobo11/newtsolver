@@ -26,7 +26,7 @@ def _parse_case_ids(values: list[str] | None) -> set[str] | None:
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        prog="fmfsolver-cli",
+        prog="newtsolver-cli",
         description="Run FMF solver from CSV/Excel input without GUI.",
     )
     parser.add_argument(

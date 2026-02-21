@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from fmfsolver.io.io_cases import INPUT_COLUMN_ORDER, InputValidationError, read_cases
+from newtsolver.io.io_cases import INPUT_COLUMN_ORDER, InputValidationError, read_cases
 
 
 class TestIoCasesValidation(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestIoCasesValidation(unittest.TestCase):
         }
 
     def test_read_cases_accepts_valid_csv(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_valid_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_valid_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
@@ -58,7 +58,7 @@ class TestIoCasesValidation(unittest.TestCase):
             )
 
     def test_read_cases_reorders_columns_to_canonical_order(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_order_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_order_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
@@ -75,7 +75,7 @@ class TestIoCasesValidation(unittest.TestCase):
             )
 
     def test_read_cases_normalizes_multi_stl_paths_to_absolute(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_multi_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_multi_") as td:
             td_path = Path(td)
             stl1 = td_path / "a.stl"
             stl2 = td_path / "b.stl"
@@ -91,7 +91,7 @@ class TestIoCasesValidation(unittest.TestCase):
             self.assertEqual(actual, [str(stl1.resolve()), str(stl2.resolve())])
 
     def test_read_cases_rejects_duplicate_case_id(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_dup_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_dup_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
@@ -105,7 +105,7 @@ class TestIoCasesValidation(unittest.TestCase):
                 read_cases(str(csv_path))
 
     def test_read_cases_rejects_partial_mode_and_bad_flags(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_mode_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_mode_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
@@ -125,7 +125,7 @@ class TestIoCasesValidation(unittest.TestCase):
             self.assertIn("must be 0 or 1", msg)
 
     def test_read_cases_accepts_and_validates_ray_backend(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_backend_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_backend_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
@@ -162,7 +162,7 @@ class TestIoCasesValidation(unittest.TestCase):
                 read_cases(str(csv_path))
 
     def test_read_cases_exposes_structured_issues(self):
-        with tempfile.TemporaryDirectory(prefix="fmfsolver_io_structured_") as td:
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_structured_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")

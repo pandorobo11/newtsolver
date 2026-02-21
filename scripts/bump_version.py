@@ -58,7 +58,7 @@ def update_pyproject_version(pyproject_path: Path, new_version: str) -> tuple[st
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Bump fmfsolver version in pyproject.toml.",
+        description="Bump newtsolver version in pyproject.toml.",
     )
     parser.add_argument(
         "target",
