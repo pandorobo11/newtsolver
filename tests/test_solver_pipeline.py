@@ -205,10 +205,10 @@ class TestSolverPipeline(unittest.TestCase):
         }
         self.assertEqual(build_case_signature(row_int), build_case_signature(row_float))
 
-    def test_run_case_mode_mg_smoke(self):
+    def test_run_case_basic_smoke(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
-                "case_id": "test_mode_mg",
+                "case_id": "test_case_basic",
                 "stl_path": "samples/stl/cube.stl",
                 "stl_scale_m_per_unit": 1.0,
                 "alpha_deg": 5.0,
@@ -242,10 +242,10 @@ class TestSolverPipeline(unittest.TestCase):
                 self.assertTrue(math.isfinite(float(result[key])), key)
             self.assertTrue(Path(td).exists())
 
-    def test_run_case_high_mach_mg_smoke(self):
+    def test_run_case_high_mach_smoke(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {
-                "case_id": "test_high_mach_mg",
+                "case_id": "test_case_high_mach",
                 "stl_path": "samples/stl/plate.stl",
                 "stl_scale_m_per_unit": 1.0,
                 "alpha_deg": 5.0,
