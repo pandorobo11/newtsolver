@@ -278,10 +278,12 @@ class CasesPanel(QtWidgets.QWidget):
             return
 
         def _mode_from_row(r: dict) -> str:
+            if pd.notna(r.get("Mach")) and pd.notna(r.get("gamma")):
+                return "MG"
             if pd.notna(r.get("S")) and pd.notna(r.get("Ti_K")):
-                return "A"
+                return "A_LEGACY"
             if pd.notna(r.get("Mach")) and pd.notna(r.get("Altitude_km")):
-                return "B"
+                return "B_LEGACY"
             return "?"
 
         cols = ["case_id", "mode"] + [c for c in self.df_cases.columns if c != "case_id"]

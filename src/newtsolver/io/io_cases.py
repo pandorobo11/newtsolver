@@ -14,9 +14,10 @@ REQUIRED = [
     "case_id",
     "stl_path",
     "stl_scale_m_per_unit",
+    "Mach",
+    "gamma",
     "alpha_deg",
     "beta_or_bank_deg",
-    "Tw_K",
     "ref_x_m",
     "ref_y_m",
     "ref_z_m",
@@ -33,18 +34,14 @@ INPUT_COLUMN_ORDER = [
     # 2) geometry
     "stl_path",
     "stl_scale_m_per_unit",
-    # 3) atmosphere (Mode A / Mode B)
-    "S",
-    "Ti_K",
+    # 3) flow condition
     "Mach",
-    "Altitude_km",
-    # 4) physical condition
-    "Tw_K",
-    # 5) attitude
+    "gamma",
+    # 4) attitude
     "alpha_deg",
     "beta_or_bank_deg",
     "attitude_input",
-    # 6) reference values
+    # 5) reference values
     "ref_x_m",
     "ref_y_m",
     "ref_z_m",
@@ -52,10 +49,10 @@ INPUT_COLUMN_ORDER = [
     "Lref_Cl_m",
     "Lref_Cm_m",
     "Lref_Cn_m",
-    # 7) shielding settings
+    # 6) shielding settings
     "shielding_on",
     "ray_backend",
-    # 8) I/O
+    # 7) I/O
     "out_dir",
     "save_vtp_on",
     "save_npz_on",
@@ -63,9 +60,10 @@ INPUT_COLUMN_ORDER = [
 
 NUMERIC_REQUIRED = [
     "stl_scale_m_per_unit",
+    "Mach",
+    "gamma",
     "alpha_deg",
     "beta_or_bank_deg",
-    "Tw_K",
     "ref_x_m",
     "ref_y_m",
     "ref_z_m",
@@ -78,13 +76,13 @@ NUMERIC_REQUIRED = [
 NUMERIC_OPTIONAL = [
     "S",
     "Ti_K",
-    "Mach",
-    "Altitude_km",
+    "Tw_K",
 ]
 
 POSITIVE_COLUMNS = {
     "stl_scale_m_per_unit",
-    "Tw_K",
+    "Mach",
+    "gamma",
     "Aref_m2",
     "Lref_Cl_m",
     "Lref_Cm_m",
@@ -209,10 +207,10 @@ def _validate_required_numeric(df: pd.DataFrame, add_issue: _AddIssueFn) -> None
 
 
 def _validate_optional_numeric(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
-    """Parse optional mode columns while preserving blank cells as NaN."""
+    """Parse optional legacy numeric columns while preserving blank cells as NaN."""
     for col in NUMERIC_OPTIONAL:
         if col not in df.columns:
-            df[col] = float("nan")
+            continue
         filled = df[col].map(is_filled)
         parsed = pd.to_numeric(df[col].where(filled), errors="coerce")
         invalid = filled & parsed.isna()
@@ -229,37 +227,15 @@ def _validate_positive_columns(df: pd.DataFrame, add_issue: _AddIssueFn) -> None
             add_issue(int(idx), col, "must be > 0.")
 
 
-def _validate_mode_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
-    """Validate that each row specifies exactly one complete mode."""
-    mode_a_s = df["S"].notna()
-    mode_a_ti = df["Ti_K"].notna()
-    mode_b_mach = df["Mach"].notna()
-    mode_b_alt = df["Altitude_km"].notna()
+def _validate_flow_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
+    """Validate required flow-condition inputs for newtsolver."""
+    invalid_gamma = df["gamma"] <= 1.0
+    for idx in df.index[invalid_gamma]:
+        add_issue(int(idx), "gamma", "must be > 1.")
 
-    mode_a_partial = mode_a_s ^ mode_a_ti
-    mode_b_partial = mode_b_mach ^ mode_b_alt
-    for idx in df.index[mode_a_partial]:
-        add_issue(int(idx), "S,Ti_K", "Mode A requires both 'S' and 'Ti_K'.")
-    for idx in df.index[mode_b_partial]:
-        add_issue(int(idx), "Mach,Altitude_km", "Mode B requires both 'Mach' and 'Altitude_km'.")
-
-    mode_a_ok = mode_a_s & mode_a_ti
-    mode_b_ok = mode_b_mach & mode_b_alt
-    both_modes = mode_a_ok & mode_b_ok
-    neither_mode = (~mode_a_ok) & (~mode_b_ok)
-    for idx in df.index[both_modes]:
-        add_issue(int(idx), "mode", "Specify either Mode A or Mode B, not both.")
-    for idx in df.index[neither_mode]:
-        add_issue(
-            int(idx),
-            "mode",
-            (
-                "Specify one complete mode "
-                "(Mode A: S+Ti_K, Mode B: Mach+Altitude_km)."
-            ),
-        )
-
-    for col in ("S", "Ti_K", "Mach"):
+    for col in ("S", "Ti_K", "Tw_K"):
+        if col not in df.columns:
+            continue
         invalid = df[col].notna() & (df[col] <= 0.0)
         for idx in df.index[invalid]:
             add_issue(int(idx), col, "must be > 0 when specified.")
@@ -335,7 +311,7 @@ def _validate_and_normalize(df: pd.DataFrame, input_path: Path) -> pd.DataFrame:
     _validate_required_numeric(df, add_issue)
     _validate_optional_numeric(df, add_issue)
     _validate_positive_columns(df, add_issue)
-    _validate_mode_inputs(df, add_issue)
+    _validate_flow_inputs(df, add_issue)
     _validate_flags(df, add_issue)
     _validate_ray_backend(df, add_issue)
     _validate_attitude_input(df, add_issue)

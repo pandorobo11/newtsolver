@@ -56,28 +56,44 @@ def _maybe_log_ray_accel_hint(logfn) -> None:
 def _mode_from_row(row: dict) -> str:
     """Determine input mode for a case row.
 
-    Mode A requires ``S`` and ``Ti_K``.
-    Mode B requires ``Mach`` and ``Altitude_km``.
+    Preferred mode requires ``Mach`` and ``gamma``.
+    Legacy modes are still accepted for compatibility.
     """
-    A_ok = is_filled(row.get("S")) and is_filled(row.get("Ti_K"))
-    B_ok = is_filled(row.get("Mach")) and is_filled(row.get("Altitude_km"))
-    if A_ok and B_ok:
-        raise ValueError(f"Case '{row.get('case_id')}' has BOTH Mode A and Mode B inputs.")
-    if (not A_ok) and (not B_ok):
-        raise ValueError(
-            f"Case '{row.get('case_id')}' has NEITHER complete Mode A nor Mode B inputs."
-        )
-    return "A" if A_ok else "B"
+    mg_ok = is_filled(row.get("Mach")) and is_filled(row.get("gamma"))
+    a_ok = is_filled(row.get("S")) and is_filled(row.get("Ti_K"))
+    b_ok = is_filled(row.get("Mach")) and is_filled(row.get("Altitude_km"))
+    if mg_ok:
+        return "MG"
+    if a_ok:
+        return "A"
+    if b_ok:
+        return "B"
+    raise ValueError(
+        f"Case '{row.get('case_id')}' is missing required inputs. "
+        "Provide Mach+gamma (preferred)."
+    )
 
 
-def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
-    """Return ``(S, Ti, mode)`` derived from case inputs."""
+def _compute_S_Ti_Tw_mode(row: dict) -> tuple[float, float, float, str]:
+    """Return ``(S, Ti, Tw, mode)`` derived from case inputs."""
     mode = _mode_from_row(row)
 
     if mode == "A":
         S = float(row["S"])
         Ti = float(row["Ti_K"])
-        return S, Ti, "A"
+        Tw = float(row["Tw_K"]) if is_filled(row.get("Tw_K")) else Ti
+        return S, Ti, Tw, mode
+
+    if mode == "MG":
+        Mach = float(row["Mach"])
+        gamma = float(row["gamma"])
+        if gamma <= 0.0:
+            raise ValueError(f"gamma must be > 0, got {gamma}")
+        # For perfect gas: V/sqrt(2RT) = Mach * sqrt(gamma/2).
+        S = Mach * math.sqrt(gamma / 2.0)
+        Ti = float(row["Ti_K"]) if is_filled(row.get("Ti_K")) else 300.0
+        Tw = float(row["Tw_K"]) if is_filled(row.get("Tw_K")) else Ti
+        return S, Ti, Tw, mode
 
     Mach = float(row["Mach"])
     alt = float(row["Altitude_km"])
@@ -90,7 +106,8 @@ def _compute_S_Ti_R(row: dict) -> tuple[float, float, str]:
 
     V_bulk = Mach * c
     S = V_bulk / v_mp
-    return S, Ti, "B"
+    Tw = float(row["Tw_K"]) if is_filled(row.get("Tw_K")) else Ti
+    return S, Ti, Tw, mode
 
 
 def _compute_force_coeffs(C_force_stl: np.ndarray, alpha_t_deg: float) -> dict[str, float]:
@@ -430,7 +447,6 @@ def run_case(row: dict, logfn) -> dict:
     Lref_Cm = float(row["Lref_Cm_m"])
     Lref_Cn = float(row["Lref_Cn_m"])
 
-    Tw = float(row["Tw_K"])
     ref_stl = np.array(
         [float(row["ref_x_m"]), float(row["ref_y_m"]), float(row["ref_z_m"])], dtype=float
     )
@@ -447,7 +463,7 @@ def run_case(row: dict, logfn) -> dict:
     out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    S, Ti, mode = _compute_S_Ti_R(row)
+    S, Ti, Tw, mode = _compute_S_Ti_Tw_mode(row)
     signature = build_case_signature(row)
 
     Vhat, alpha_t_deg, beta_t_deg, attitude_mode = resolve_attitude_to_vhat(

@@ -80,11 +80,8 @@ Supported formats:
 | `case_id` | Yes | string | Case identifier | Used in logs, output row key, and output file names (`<case_id>.vtp/.npz`). |
 | `stl_path` | Yes | string | STL file path(s) | Multiple STL files can be combined with `;` separator. Relative paths are resolved from the input file directory. |
 | `stl_scale_m_per_unit` | Yes | float | m per STL unit | Scale factor applied to STL coordinates. Example: STL in mm -> `0.001`. |
-| `S` | Mode A only | float | Molecular speed ratio | Provide together with `Ti_K`. |
-| `Ti_K` | Mode A only | K | Free-stream translational temperature | Provide together with `S`. |
-| `Mach` | Mode B only | float | Mach number | Used with `Altitude_km` to derive `S` and `Ti_K` from US1976. |
-| `Altitude_km` | Mode B only | km | Geometric altitude | Used with `Mach` for atmospheric lookup. |
-| `Tw_K` | Yes | K | Wall temperature | Used in Sentman coefficient term `C`. |
+| `Mach` | Yes | float | Mach number | Freestream Mach number. Must be > 0. |
+| `gamma` | Yes | float | - | Ratio of specific heats. Must be > 1. |
 | `alpha_deg` | Yes | deg | 1st attitude angle | Meaning depends on `attitude_input`. |
 | `beta_or_bank_deg` | Yes | deg | 2nd attitude angle | `beta` for `beta_tan`/`beta_sin`, `bank angle (phi)` for `bank`. |
 | `attitude_input` | No | string | Attitude-angle definition | `beta_tan` (default), `beta_sin`, `bank`. |
@@ -101,11 +98,9 @@ Supported formats:
 | `save_vtp_on` | No | 0/1 int | Write VTP file | `1`: write `<out_dir>/<case_id>.vtp`. Default `1`. |
 | `save_npz_on` | No | 0/1 int | Write NPZ file | `1`: write `<out_dir>/<case_id>.npz`. Default `0`. |
 
-Mode selection rules:
-- Mode A: specify both `S` and `Ti_K`.
-- Mode B: specify both `Mach` and `Altitude_km`.
-- Do not provide both Mode A and Mode B in one row.
-- Do not leave both mode pairs incomplete.
+Flow input rules:
+- Provide `Mach` and `gamma` in every row.
+- Legacy columns (`S`, `Ti_K`, `Tw_K`, `Altitude_km`) are optional compatibility fields and are not required.
 
 ### Ray Backend (`ray_backend`)
 
@@ -236,9 +231,9 @@ Main outputs:
 | `run_started_at_utc` | ISO8601 string | Run start timestamp (UTC) | Per case execution. |
 | `run_finished_at_utc` | ISO8601 string | Run end timestamp (UTC) | Per case execution. |
 | `run_elapsed_s` | float | Elapsed time [s] | Per case execution wall time. |
-| `mode` | string | Resolved mode | `A` or `B`. |
-| `out_S` | float | Effective molecular speed ratio | Prefixed with `out_` because `S` also exists in input columns. |
-| `out_Ti_K` | float | Effective translational temperature [K] | Prefixed with `out_` because `Ti_K` also exists in input columns. |
+| `mode` | string | Resolved mode | Typically `MG` (Mach+gamma). Legacy inputs may yield `A` or `B`. |
+| `out_S` | float | Effective molecular speed ratio | Computed from flow inputs; exported with `out_` prefix. |
+| `out_Ti_K` | float | Effective translational temperature [K] | Internal effective value used in the solver pipeline. |
 | `out_attitude_input` | string | Resolved attitude input mode | Prefixed with `out_` because `attitude_input` also exists in input columns. |
 | `alpha_t_deg_resolved` | float | Resolved `alpha_t` [deg] | Tangent-definition angle used in coefficient transform. |
 | `beta_t_deg_resolved` | float | Resolved `beta_t` [deg] | Tangent-definition angle used in coefficient transform. |
@@ -263,10 +258,8 @@ Main outputs:
 
 - `Missing required columns`:
   - Input file does not include mandatory headers listed above.
-- `has BOTH Mode A and Mode B inputs`:
-  - A row has both (`S`,`Ti_K`) and (`Mach`,`Altitude_km`).
-- `has NEITHER complete Mode A nor Mode B inputs`:
-  - A row lacks a valid pair for both modes.
+- `gamma must be > 1`:
+  - `gamma` is physically invalid (or missing/invalid numeric).
 - VTP not auto-loaded when selecting case:
   - VTP may be missing or `case_signature` does not match current case conditions.
 

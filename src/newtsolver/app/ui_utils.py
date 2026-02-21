@@ -29,21 +29,29 @@ def format_case_text(row: dict) -> str:
 
     add("case_id", row.get("case_id"))
 
-    # Mode A/B inputs (as entered)
-    if str(row.get("S")).strip() not in ("", "nan", "None") and str(
+    # Preferred flow inputs.
+    if str(row.get("Mach")).strip() not in ("", "nan", "None") and str(
+        row.get("gamma")
+    ).strip() not in ("", "nan", "None"):
+        add("mode", "MG")
+        add("Mach", row.get("Mach"))
+        add("gamma", row.get("gamma"))
+    # Legacy input styles are still displayed when present.
+    elif str(row.get("S")).strip() not in ("", "nan", "None") and str(
         row.get("Ti_K")
     ).strip() not in ("", "nan", "None"):
-        add("mode", "A")
+        add("mode", "A_LEGACY")
         add("S", row.get("S"))
         add("Ti", row.get("Ti_K"))
     elif str(row.get("Mach")).strip() not in ("", "nan", "None") and str(
         row.get("Altitude_km")
     ).strip() not in ("", "nan", "None"):
-        add("mode", "B")
+        add("mode", "B_LEGACY")
         add("Mach", row.get("Mach"))
         add("Alt_km", row.get("Altitude_km"))
 
-    add("Tw", row.get("Tw_K"))
+    if str(row.get("Tw_K")).strip() not in ("", "nan", "None"):
+        add("Tw", row.get("Tw_K"))
 
     alpha_in = _as_float(row.get("alpha_deg"))
     beta_in = _as_float(row.get("beta_or_bank_deg"))

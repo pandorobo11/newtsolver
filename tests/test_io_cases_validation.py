@@ -15,9 +15,10 @@ class TestIoCasesValidation(unittest.TestCase):
             "case_id": "case_ok",
             "stl_path": stl_path,
             "stl_scale_m_per_unit": 1.0,
+            "Mach": 6.0,
+            "gamma": 1.4,
             "alpha_deg": 0.0,
             "beta_or_bank_deg": 0.0,
-            "Tw_K": 300.0,
             "ref_x_m": 0.0,
             "ref_y_m": 0.0,
             "ref_z_m": 0.0,
@@ -25,10 +26,6 @@ class TestIoCasesValidation(unittest.TestCase):
             "Lref_Cl_m": 1.0,
             "Lref_Cm_m": 1.0,
             "Lref_Cn_m": 1.0,
-            "S": 5.0,
-            "Ti_K": 300.0,
-            "Mach": "",
-            "Altitude_km": "",
             "shielding_on": 0,
             "save_vtp_on": 1,
             "save_npz_on": 0,
@@ -104,15 +101,15 @@ class TestIoCasesValidation(unittest.TestCase):
             with self.assertRaisesRegex(InputValidationError, "Duplicate case_id values"):
                 read_cases(str(csv_path))
 
-    def test_read_cases_rejects_partial_mode_and_bad_flags(self):
-        with tempfile.TemporaryDirectory(prefix="newtsolver_io_mode_") as td:
+    def test_read_cases_rejects_invalid_gamma_and_bad_flags(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_gamma_") as td:
             td_path = Path(td)
             stl_path = td_path / "mesh.stl"
             stl_path.write_text("solid mesh\nendsolid mesh\n", encoding="utf-8")
             csv_path = td_path / "input.csv"
 
             row = self._base_row("mesh.stl")
-            row["Ti_K"] = ""
+            row["gamma"] = 0.9
             row["save_vtp_on"] = 2
             df = pd.DataFrame([row])
             df.to_csv(csv_path, index=False)
@@ -120,7 +117,8 @@ class TestIoCasesValidation(unittest.TestCase):
             with self.assertRaises(InputValidationError) as cm:
                 read_cases(str(csv_path))
             msg = str(cm.exception)
-            self.assertIn("Mode A requires both 'S' and 'Ti_K'", msg)
+            self.assertIn("gamma", msg)
+            self.assertIn("must be > 1", msg)
             self.assertIn("save_vtp_on", msg)
             self.assertIn("must be 0 or 1", msg)
 
