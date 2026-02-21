@@ -6,6 +6,12 @@ Sentman free-molecular-flow (FMF) panel solver for STL geometry.
 - CLI: batch execution from CSV/Excel input file.
 - Output: result CSV, per-case VTP, optional NPZ.
 
+## Runtime Environment
+
+- Python: `>=3.12`
+- OS: macOS / Linux / Windows
+- Recommended: install with `rayaccel` extra when Embree is available on your platform.
+
 ## Install
 
 ### uv
@@ -161,7 +167,7 @@ Viewer controls:
 - Colorbar range: `vmin` / `vmax` (blank = auto), `Auto range`
 - Camera: axis views, two ISO views, `Wind +` / `Wind -`
 - `Save Image...`: save the current viewer image
-- `Save Selected...`: save images for all currently selected cases in the case table (cases without matching VTP are skipped)
+- `Save Selected...`: choose an output folder and export `<case_id>.png` for selected cases using `out_dir/<case_id>.vtp` (missing VTPs are skipped and logged)
 - `Open VTP...`: open an existing VTP file manually
 
 Behavior note:
@@ -219,17 +225,34 @@ Main outputs:
 - Result summary CSV:
   - default: `outputs/<input_stem>_result.csv` (CLI)
   - GUI: chosen in save dialog
+  - input-side columns are included first, in the same order as the input file specification
   - for multi-STL cases, includes one `scope=total` row and one `scope=component` row per STL
-  - component rows include:
-    - `component_id`
-    - `component_stl_path`
-  - includes traceability columns:
-    - `solver_version`
-    - `case_signature`
-    - `ray_backend_used`
-    - `run_started_at_utc`
-    - `run_finished_at_utc`
-    - `run_elapsed_s`
+  - output-side columns are appended after input columns:
+
+| Column | Type | Meaning | Notes |
+|---|---|---|---|
+| `solver_version` | string | Solver/package version | For reproducibility. |
+| `case_signature` | string | Hash of case inputs | Used to verify VTP/input consistency. |
+| `run_started_at_utc` | ISO8601 string | Run start timestamp (UTC) | Per case execution. |
+| `run_finished_at_utc` | ISO8601 string | Run end timestamp (UTC) | Per case execution. |
+| `run_elapsed_s` | float | Elapsed time [s] | Per case execution wall time. |
+| `mode` | string | Resolved mode | `A` or `B`. |
+| `out_S` | float | Effective molecular speed ratio | Prefixed with `out_` because `S` also exists in input columns. |
+| `out_Ti_K` | float | Effective translational temperature [K] | Prefixed with `out_` because `Ti_K` also exists in input columns. |
+| `out_attitude_input` | string | Resolved attitude input mode | Prefixed with `out_` because `attitude_input` also exists in input columns. |
+| `alpha_t_deg_resolved` | float | Resolved `alpha_t` [deg] | Tangent-definition angle used in coefficient transform. |
+| `beta_t_deg_resolved` | float | Resolved `beta_t` [deg] | Tangent-definition angle used in coefficient transform. |
+| `scope` | string | Row scope | `total` or `component`. |
+| `component_id` | int/blank | Component index | Set for `scope=component`. |
+| `component_stl_path` | string/blank | Component STL path | Set for `scope=component`. |
+| `ray_backend_used` | string | Actual backend used | `not_used`, `rtree`, or `embree`. |
+| `CA`,`CY`,`CN` | float | Body-axis force coefficients | Integrated over row scope. |
+| `Cl`,`Cm`,`Cn` | float | Body-axis moment coefficients | Integrated over row scope. |
+| `CD`,`CL` | float | Stability-axis force coefficients | Derived from resolved `alpha_t`. |
+| `faces` | int | Number of faces in row scope | Total or per component. |
+| `shielded_faces` | int | Number of shielded faces in row scope | Total or per component. |
+| `vtp_path` | string/blank | Saved VTP path | Filled for `scope=total` when `save_vtp_on=1`. |
+| `npz_path` | string/blank | Saved NPZ path | Filled for `scope=total` when `save_npz_on=1`. |
 - Per-case VTP:
   - `<out_dir>/<case_id>.vtp` when `save_vtp_on=1`
   - includes `stl_index` in cell data for per-face source STL identification
