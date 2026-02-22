@@ -115,6 +115,32 @@ Flow input rules:
   - `newtonian_mirror`: applies Newtonian-mirror magnitude on leeward faces (`Cp = 2 * (n_in·Vhat)^2` with `n_in·Vhat <= 0`).
   - `prandtl_meyer`: applies Prandtl-Meyer expansion pressure from freestream `Mach`/`gamma` and local deflection (`Cp <= 0`).
 
+### Windward / Leeward Method Guide
+
+Local side classification is done panel-by-panel with:
+- `gamma_n = n_in · Vhat`
+- `n_in`: inward unit normal of the panel, `Vhat`: freestream unit direction (STL axes)
+- `gamma_n` is the directional cosine between `n_in` and `Vhat` (`gamma_n = cos(phi)`).
+  - sign (`+/-`) tells whether flow enters/leaves the panel with respect to the inward normal
+  - magnitude (`|gamma_n|`) indicates how aligned the panel is with the flow direction
+- windward: `gamma_n > 0`
+- leeward: `gamma_n <= 0`
+
+Model behavior:
+
+| Side | Method | Behavior |
+|---|---|---|
+| windward | `newtonian` | Simple impact-pressure model (`Cp ~ sin^2(delta)`), robust baseline. |
+| windward | `modified_newtonian` | Same shape as Newtonian, but scaled by `Cp_max(Mach,gamma)` (strong-shock corrected stagnation cap). |
+| leeward | `shield` | No suction contribution (`Cp=0`), conservative and stable default. |
+| leeward | `newtonian_mirror` | Symmetric Newtonian magnitude on leeward side; often overpredicts suction. |
+| leeward | `prandtl_meyer` | Isentropic expansion-based suction (`Cp<=0`) using `Mach` and `gamma`; physically richer for expansion surfaces. |
+
+Typical combinations:
+- conservative engineering baseline: `windward_eq=newtonian`, `leeward_eq=shield`
+- stronger windward realism (high Mach): `windward_eq=modified_newtonian`, `leeward_eq=shield`
+- include leeward expansion effects: `windward_eq=newtonian` (or `modified_newtonian`), `leeward_eq=prandtl_meyer`
+
 ### Ray Backend (`ray_backend`)
 
 - `auto` (default): use Embree when available, otherwise `rtree`.
