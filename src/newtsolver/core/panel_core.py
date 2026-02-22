@@ -3,6 +3,7 @@ from __future__ import annotations
 """Newtonian pressure model and coordinate transforms."""
 
 import math
+from functools import lru_cache
 
 import numpy as np
 
@@ -89,6 +90,60 @@ def _real_cuberoot(value: float) -> float:
     if value >= 0.0:
         return value ** (1.0 / 3.0)
     return -((-value) ** (1.0 / 3.0))
+
+
+@lru_cache(maxsize=256)
+def _tangent_wedge_detach_limit(Mach: float, gamma: float) -> tuple[float, float]:
+    """Return ``(theta_max, cp_crit)`` for weak attached tangent-wedge branch."""
+    M = float(Mach)
+    g = float(gamma)
+    if M <= 1.0:
+        raise ValueError(f"tangent_wedge requires Mach > 1, got {M}")
+    if g <= 1.0:
+        raise ValueError(f"gamma must be > 1, got {g}")
+
+    mu = math.asin(1.0 / M)
+    beta_lo = mu + 1e-9
+    beta_hi = 0.5 * math.pi - 1e-8
+
+    # Coarse scan to bracket the maximizer of theta(beta), then refine locally.
+    beta_scan = np.linspace(beta_lo, beta_hi, 4096, dtype=float)
+    theta_scan = np.array([_oblique_theta_from_beta(M, g, float(b)) for b in beta_scan], dtype=float)
+    idx = int(np.argmax(theta_scan))
+    i0 = max(0, idx - 1)
+    i1 = min(len(beta_scan) - 1, idx + 1)
+    a = float(beta_scan[i0])
+    b = float(beta_scan[i1])
+
+    # Golden-section maximization on [a, b].
+    phi = 0.5 * (1.0 + math.sqrt(5.0))
+    invphi = 1.0 / phi
+    c = b - (b - a) * invphi
+    d = a + (b - a) * invphi
+    fc = _oblique_theta_from_beta(M, g, c)
+    fd = _oblique_theta_from_beta(M, g, d)
+    for _ in range(80):
+        if fc > fd:
+            b = d
+            d = c
+            fd = fc
+            c = b - (b - a) * invphi
+            fc = _oblique_theta_from_beta(M, g, c)
+        else:
+            a = c
+            c = d
+            fc = fd
+            d = a + (b - a) * invphi
+            fd = _oblique_theta_from_beta(M, g, d)
+        if (b - a) < 1e-14:
+            break
+
+    beta_peak = 0.5 * (a + b)
+    theta_max = _oblique_theta_from_beta(M, g, beta_peak)
+    mn1 = M * math.sin(beta_peak)
+    p2_p1 = 1.0 + (2.0 * g / (g + 1.0)) * (mn1 * mn1 - 1.0)
+    cp_crit = (2.0 / (g * M * M)) * (p2_p1 - 1.0)
+    return float(theta_max), float(max(cp_crit, 0.0))
 
 
 def _weak_oblique_shock_beta(Mach: float, gamma: float, theta: float) -> float | None:
@@ -189,7 +244,7 @@ def tangent_wedge_pressure_coefficient(
         Mach: Freestream Mach number (>1).
         gamma: Ratio of specific heats (>1).
         deltar: Local positive turning angle [rad] on windward side.
-        cp_cap: Optional cap for detached-shock fallback (defaults to Cp_max).
+        cp_cap: Optional modified-Newtonian cap ``Cp_max`` (defaults to Cp_max).
     """
     M = float(Mach)
     g = float(gamma)
@@ -204,7 +259,18 @@ def tangent_wedge_pressure_coefficient(
     cap = float(cp_cap) if cp_cap is not None else modified_newtonian_cp_max(Mach=M, gamma=g)
     beta = _weak_oblique_shock_beta(Mach=M, gamma=g, theta=theta)
     if beta is None:
-        return cap
+        # Detached regime: smoothly bridge from attached-limit Cp(theta_max)
+        # to Cp_cap at theta=90 deg.
+        theta_max, cp_crit_raw = _tangent_wedge_detach_limit(M, g)
+        cp_crit = min(max(cp_crit_raw, 0.0), cap)
+        if theta <= theta_max:
+            return cp_crit
+        denom = max(0.5 * math.pi - theta_max, 1e-12)
+        x = (theta - theta_max) / denom
+        x = min(max(x, 0.0), 1.0)
+        w = x * x * (3.0 - 2.0 * x)  # smoothstep
+        cp = cp_crit + (cap - cp_crit) * w
+        return min(max(cp, 0.0), cap)
 
     mn1 = M * math.sin(beta)
     if mn1 <= 1.0:

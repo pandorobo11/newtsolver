@@ -8,6 +8,7 @@ import numpy as np
 from newtsolver.core.panel_core import (
     _inverse_prandtl_meyer,
     _prandtl_meyer_nu,
+    _tangent_wedge_detach_limit,
     modified_newtonian_cp_max,
     newtonian_dC_dA_vector,
     newtonian_dC_dA_vectors,
@@ -79,6 +80,46 @@ class TestPanelCore(unittest.TestCase):
         )
         self.assertGreater(cp, 0.0)
         self.assertLess(cp, cp_cap)
+
+    def test_tangent_wedge_detached_bridges_to_cp_cap(self):
+        mach = 2.0
+        gamma = 1.4
+        theta = math.radians(24.0)  # above detach threshold for M=2, gamma=1.4
+        cp_cap = modified_newtonian_cp_max(Mach=mach, gamma=gamma)
+        theta_max, cp_crit = _tangent_wedge_detach_limit(mach, gamma)
+
+        cp = tangent_wedge_pressure_coefficient(
+            Mach=mach,
+            gamma=gamma,
+            deltar=theta,
+            cp_cap=cp_cap,
+        )
+        self.assertGreater(cp, cp_crit)
+        self.assertLess(cp, cp_cap)
+
+        # At 90 deg, detached bridge should reach Cp_cap.
+        cp_90 = tangent_wedge_pressure_coefficient(
+            Mach=mach,
+            gamma=gamma,
+            deltar=math.radians(90.0),
+            cp_cap=cp_cap,
+        )
+        self.assertAlmostEqual(cp_90, cp_cap, places=12)
+
+        # No drop at detach boundary.
+        cp_before = tangent_wedge_pressure_coefficient(
+            Mach=mach,
+            gamma=gamma,
+            deltar=theta_max * (1.0 - 1e-6),
+            cp_cap=cp_cap,
+        )
+        cp_after = tangent_wedge_pressure_coefficient(
+            Mach=mach,
+            gamma=gamma,
+            deltar=theta_max * (1.0 + 1e-6),
+            cp_cap=cp_cap,
+        )
+        self.assertGreaterEqual(cp_after + 1e-12, cp_before)
 
     def test_tangent_wedge_windward_generates_force(self):
         v = newtonian_dC_dA_vector(

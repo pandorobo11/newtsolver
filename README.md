@@ -109,7 +109,7 @@ Flow input rules:
 - `windward_eq`
   - `newtonian` (default): `Cp = 2 * (n_in·Vhat)^2` on windward faces.
   - `modified_newtonian`: `Cp = Cp_max(Mach, gamma) * (n_in·Vhat)^2` on windward faces.
-  - `tangent_wedge`: oblique-shock tangent-wedge compression model (`Mach > 1`) using `Mach`/`gamma`; detached cases are capped by `Cp_max`.
+  - `tangent_wedge`: oblique-shock tangent-wedge compression model (`Mach > 1`) using `Mach`/`gamma`; detached cases smoothly bridge from `Cp(theta_max)` to `Cp_max` at `theta=90 deg`.
 - `leeward_eq`
   - `shield` (default): leeward contribution is forced to `Cp = 0`.
   - `prandtl_meyer`: applies Prandtl-Meyer expansion pressure from freestream `Mach`/`gamma` and local deflection (`Cp <= 0`).
@@ -131,7 +131,7 @@ Model behavior:
 |---|---|---|
 | windward | `newtonian` | Simple impact-pressure model (`Cp ~ sin^2(delta)`), robust baseline. |
 | windward | `modified_newtonian` | Same shape as Newtonian, but scaled by `Cp_max(Mach,gamma)` (strong-shock corrected stagnation cap). |
-| windward | `tangent_wedge` | Uses weak oblique-shock relation for compression; detached regime falls back to `Cp_max`. |
+| windward | `tangent_wedge` | Uses weak oblique-shock relation for compression; detached regime smoothly transitions from attached-limit `Cp` to `Cp_max`. |
 | leeward | `shield` | No suction contribution (`Cp=0`), conservative and stable default. |
 | leeward | `prandtl_meyer` | Isentropic expansion-based suction (`Cp<=0`) using `Mach` and `gamma`; physically richer for expansion surfaces. |
 
