@@ -94,7 +94,11 @@ def _real_cuberoot(value: float) -> float:
 
 @lru_cache(maxsize=256)
 def _tangent_wedge_detach_limit(Mach: float, gamma: float) -> tuple[float, float]:
-    """Return ``(theta_max, cp_crit)`` for weak attached tangent-wedge branch."""
+    """Return ``(theta_max, cp_crit)`` for weak attached tangent-wedge branch.
+
+    Uses the discriminant-zero condition of the theta-beta-M cubic
+    (double root at detach) to compute ``theta_max`` analytically.
+    """
     M = float(Mach)
     g = float(gamma)
     if M <= 1.0:
@@ -102,44 +106,73 @@ def _tangent_wedge_detach_limit(Mach: float, gamma: float) -> tuple[float, float
     if g <= 1.0:
         raise ValueError(f"gamma must be > 1, got {g}")
 
+    m2 = M * M
+    c = -2.0 * (m2 - 1.0)
+    t1 = m2 * (g + 1.0) + 2.0
+    t2 = m2 * (g - 1.0) + 2.0
+
+    # Discriminant of 2*x^3 + b*x^2 + c*x + d = 0 with
+    # b = tan(theta)*t1, d = tan(theta)*t2 and x = cot(beta).
+    # Delta=0 gives detach limit and reduces to quadratic in y = tan(theta)^2:
+    # A*y^2 + B*y + C0 = 0.
+    A = -4.0 * (t1**3) * t2
+    B = 36.0 * t1 * t2 * c + (t1 * t1) * (c * c) - 108.0 * (t2 * t2)
+    C0 = -8.0 * (c**3)
+
+    y_candidates: list[float] = []
+    if abs(A) > 1e-30:
+        q = B * B - 4.0 * A * C0
+        if q < 0.0 and q > -1e-24:
+            q = 0.0
+        if q < 0.0:
+            raise RuntimeError("Failed to compute tangent-wedge detach limit (negative discriminant).")
+        sq = math.sqrt(q)
+        y_candidates.extend([(-B + sq) / (2.0 * A), (-B - sq) / (2.0 * A)])
+    elif abs(B) > 1e-30:
+        y_candidates.append(-C0 / B)
+    else:
+        raise RuntimeError("Failed to compute tangent-wedge detach limit (degenerate quadratic).")
+
+    theta_candidates = [math.atan(math.sqrt(y)) for y in y_candidates if y > 0.0 and math.isfinite(y)]
+    if not theta_candidates:
+        raise RuntimeError("Failed to compute tangent-wedge detach limit (no physical theta candidate).")
+
+    # Physical detach limit is the larger positive root.
+    theta_max = max(theta_candidates)
+
+    # Recover beta at detach from the double-root condition f(x)=f'(x)=0.
+    tan_t = math.tan(theta_max)
+    b = tan_t * t1
+    d = tan_t * t2
+    deriv_disc = b * b - 6.0 * c
+    if deriv_disc < 0.0 and deriv_disc > -1e-24:
+        deriv_disc = 0.0
+    if deriv_disc < 0.0:
+        raise RuntimeError("Failed to compute tangent-wedge detach beta (negative derivative discriminant).")
+    sqd = math.sqrt(deriv_disc)
+    x_roots = [(-b + sqd) / 6.0, (-b - sqd) / 6.0]
+
     mu = math.asin(1.0 / M)
-    beta_lo = mu + 1e-9
-    beta_hi = 0.5 * math.pi - 1e-8
+    x_max = 1.0 / math.tan(mu)
+    beta_peak = None
+    best_key = None
+    for x in x_roots:
+        if not math.isfinite(x) or not (0.0 < x < x_max):
+            continue
+        beta = math.atan2(1.0, x)
+        if not (mu < beta < 0.5 * math.pi):
+            continue
+        # Choose candidate with the smallest cubic residual and theta mismatch.
+        f_res = abs(2.0 * x**3 + b * x * x + c * x + d)
+        th_res = abs(_oblique_theta_from_beta(M, g, beta) - theta_max)
+        key = (f_res, th_res)
+        if best_key is None or key < best_key:
+            best_key = key
+            beta_peak = beta
 
-    # Coarse scan to bracket the maximizer of theta(beta), then refine locally.
-    beta_scan = np.linspace(beta_lo, beta_hi, 4096, dtype=float)
-    theta_scan = np.array([_oblique_theta_from_beta(M, g, float(b)) for b in beta_scan], dtype=float)
-    idx = int(np.argmax(theta_scan))
-    i0 = max(0, idx - 1)
-    i1 = min(len(beta_scan) - 1, idx + 1)
-    a = float(beta_scan[i0])
-    b = float(beta_scan[i1])
+    if beta_peak is None:
+        raise RuntimeError("Failed to compute tangent-wedge detach beta (no physical root).")
 
-    # Golden-section maximization on [a, b].
-    phi = 0.5 * (1.0 + math.sqrt(5.0))
-    invphi = 1.0 / phi
-    c = b - (b - a) * invphi
-    d = a + (b - a) * invphi
-    fc = _oblique_theta_from_beta(M, g, c)
-    fd = _oblique_theta_from_beta(M, g, d)
-    for _ in range(80):
-        if fc > fd:
-            b = d
-            d = c
-            fd = fc
-            c = b - (b - a) * invphi
-            fc = _oblique_theta_from_beta(M, g, c)
-        else:
-            a = c
-            c = d
-            fc = fd
-            d = a + (b - a) * invphi
-            fd = _oblique_theta_from_beta(M, g, d)
-        if (b - a) < 1e-14:
-            break
-
-    beta_peak = 0.5 * (a + b)
-    theta_max = _oblique_theta_from_beta(M, g, beta_peak)
     mn1 = M * math.sin(beta_peak)
     p2_p1 = 1.0 + (2.0 * g / (g + 1.0)) * (mn1 * mn1 - 1.0)
     cp_crit = (2.0 / (g * M * M)) * (p2_p1 - 1.0)
