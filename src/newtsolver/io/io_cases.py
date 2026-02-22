@@ -88,8 +88,8 @@ POSITIVE_COLUMNS = {
 FLAG_COLUMNS = ["shielding_on", "save_vtp_on", "save_npz_on"]
 RAY_BACKEND_VALUES = {"auto", "rtree", "embree"}
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge", "shield"}
-LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror", "prandtl_meyer"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge"}
+LEEWARD_EQUATION_VALUES = {"shield", "prandtl_meyer"}
 
 DEFAULTS = {
     "shielding_on": 0,
@@ -294,7 +294,7 @@ def _validate_surface_equations(df: pd.DataFrame, add_issue: _AddIssueFn) -> Non
         add_issue(
             int(idx),
             "windward_eq",
-            "must be one of: newtonian, modified_newtonian, tangent_wedge, shield.",
+            "must be one of: newtonian, modified_newtonian, tangent_wedge.",
         )
 
     df["leeward_eq"] = df["leeward_eq"].map(_normalize_leeward_eq)
@@ -303,7 +303,7 @@ def _validate_surface_equations(df: pd.DataFrame, add_issue: _AddIssueFn) -> Non
         add_issue(
             int(idx),
             "leeward_eq",
-            "must be one of: shield, newtonian_mirror, prandtl_meyer.",
+            "must be one of: shield, prandtl_meyer.",
         )
 
 

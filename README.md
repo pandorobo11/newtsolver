@@ -82,8 +82,8 @@ Supported formats:
 | `stl_scale_m_per_unit` | Yes | float | m per STL unit | Scale factor applied to STL coordinates. Example: STL in mm -> `0.001`. |
 | `Mach` | Yes | float | Mach number | Freestream Mach number. Must be > 0. |
 | `gamma` | Yes | float | - | Ratio of specific heats. Must be > 1. |
-| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, `tangent_wedge`, or `shield` (`Cp=0`). |
-| `leeward_eq` | No | string | Leeward pressure equation | `shield` (default), `newtonian_mirror`, or `prandtl_meyer`. |
+| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, or `tangent_wedge`. |
+| `leeward_eq` | No | string | Leeward pressure equation | `shield` (default) or `prandtl_meyer`. |
 | `alpha_deg` | Yes | deg | 1st attitude angle | Meaning depends on `attitude_input`. |
 | `beta_or_bank_deg` | Yes | deg | 2nd attitude angle | `beta` for `beta_tan`/`beta_sin`, `bank angle (phi)` for `bank`. |
 | `attitude_input` | No | string | Attitude-angle definition | `beta_tan` (default), `beta_sin`, `bank`. |
@@ -110,10 +110,8 @@ Flow input rules:
   - `newtonian` (default): `Cp = 2 * (n_in·Vhat)^2` on windward faces.
   - `modified_newtonian`: `Cp = Cp_max(Mach, gamma) * (n_in·Vhat)^2` on windward faces.
   - `tangent_wedge`: oblique-shock tangent-wedge compression model (`Mach > 1`) using `Mach`/`gamma`; detached cases are capped by `Cp_max`.
-  - `shield`: windward contribution is forced to `Cp = 0`.
 - `leeward_eq`
   - `shield` (default): leeward contribution is forced to `Cp = 0`.
-  - `newtonian_mirror`: applies Newtonian-mirror magnitude on leeward faces (`Cp = 2 * (n_in·Vhat)^2` with `n_in·Vhat <= 0`).
   - `prandtl_meyer`: applies Prandtl-Meyer expansion pressure from freestream `Mach`/`gamma` and local deflection (`Cp <= 0`).
 
 ### Windward / Leeward Method Guide
@@ -135,7 +133,6 @@ Model behavior:
 | windward | `modified_newtonian` | Same shape as Newtonian, but scaled by `Cp_max(Mach,gamma)` (strong-shock corrected stagnation cap). |
 | windward | `tangent_wedge` | Uses weak oblique-shock relation for compression; detached regime falls back to `Cp_max`. |
 | leeward | `shield` | No suction contribution (`Cp=0`), conservative and stable default. |
-| leeward | `newtonian_mirror` | Symmetric Newtonian magnitude on leeward side; often overpredicts suction. |
 | leeward | `prandtl_meyer` | Isentropic expansion-based suction (`Cp<=0`) using `Mach` and `gamma`; physically richer for expansion surfaces. |
 
 Typical combinations:

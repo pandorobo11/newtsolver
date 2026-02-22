@@ -51,26 +51,6 @@ class TestPanelCore(unittest.TestCase):
         )
         np.testing.assert_allclose(v, np.zeros(3), rtol=0.0, atol=0.0)
 
-    def test_leeward_newtonian_mirror_can_generate_force(self):
-        v = newtonian_dC_dA_vector(
-            Vhat=np.array([1.0, 0.0, 0.0]),
-            n_out=np.array([1.0, 0.0, 0.0]),
-            Aref=1.0,
-            shielded=False,
-            leeward_eq="newtonian_mirror",
-        )
-        np.testing.assert_allclose(v, np.array([-2.0, 0.0, 0.0]), rtol=0.0, atol=1e-12)
-
-    def test_windward_shield_zeroes_force(self):
-        v = newtonian_dC_dA_vector(
-            Vhat=np.array([1.0, 0.0, 0.0]),
-            n_out=np.array([-1.0, 0.0, 0.0]),
-            Aref=1.0,
-            shielded=False,
-            windward_eq="shield",
-        )
-        np.testing.assert_allclose(v, np.zeros(3), rtol=0.0, atol=0.0)
-
     def test_modified_newtonian_cp_max_is_finite(self):
         cp_max = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
         self.assertTrue(math.isfinite(cp_max))
@@ -113,6 +93,22 @@ class TestPanelCore(unittest.TestCase):
         )
         self.assertGreater(float(v[0]), 0.0)
         self.assertLess(float(v[0]), 2.0)
+
+    def test_removed_surface_equations_are_rejected(self):
+        with self.assertRaises(ValueError):
+            newtonian_dC_dA_vector(
+                Vhat=np.array([1.0, 0.0, 0.0]),
+                n_out=np.array([-1.0, 0.0, 0.0]),
+                Aref=1.0,
+                windward_eq="shield",
+            )
+        with self.assertRaises(ValueError):
+            newtonian_dC_dA_vector(
+                Vhat=np.array([1.0, 0.0, 0.0]),
+                n_out=np.array([1.0, 0.0, 0.0]),
+                Aref=1.0,
+                leeward_eq="newtonian_mirror",
+            )
 
     def test_prandtl_meyer_leeward_pressure_is_negative_and_bounded(self):
         cp = prandtl_meyer_pressure_coefficient(Mach=6.0, gamma=1.4, deltar=math.radians(-10.0))

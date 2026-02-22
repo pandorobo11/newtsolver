@@ -161,13 +161,17 @@ class TestIoCasesValidation(unittest.TestCase):
             with self.assertRaisesRegex(InputValidationError, "attitude_input"):
                 read_cases(str(csv_path))
 
-            row_eq = self._base_row("mesh.stl")
-            row_eq["windward_eq"] = "shield"
-            row_eq["leeward_eq"] = "newtonian_mirror"
-            pd.DataFrame([row_eq]).to_csv(csv_path, index=False)
-            loaded = read_cases(str(csv_path))
-            self.assertEqual(str(loaded.loc[0, "windward_eq"]), "shield")
-            self.assertEqual(str(loaded.loc[0, "leeward_eq"]), "newtonian_mirror")
+            row_eq_removed_w = self._base_row("mesh.stl")
+            row_eq_removed_w["windward_eq"] = "shield"
+            pd.DataFrame([row_eq_removed_w]).to_csv(csv_path, index=False)
+            with self.assertRaisesRegex(InputValidationError, "windward_eq"):
+                read_cases(str(csv_path))
+
+            row_eq_removed_l = self._base_row("mesh.stl")
+            row_eq_removed_l["leeward_eq"] = "newtonian_mirror"
+            pd.DataFrame([row_eq_removed_l]).to_csv(csv_path, index=False)
+            with self.assertRaisesRegex(InputValidationError, "leeward_eq"):
+                read_cases(str(csv_path))
 
             row_eq_pm = self._base_row("mesh.stl")
             row_eq_pm["leeward_eq"] = "prandtl_meyer"

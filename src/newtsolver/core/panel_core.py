@@ -7,8 +7,8 @@ import math
 import numpy as np
 
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge", "shield"}
-LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror", "prandtl_meyer"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge"}
+LEEWARD_EQUATION_VALUES = {"shield", "prandtl_meyer"}
 
 def _resolve_attitude_mode(attitude_input: str | None) -> str:
     """Return canonical attitude mode with default and validation."""
@@ -27,7 +27,7 @@ def _resolve_windward_equation(value: str | None) -> str:
     if eq not in WINDWARD_EQUATION_VALUES:
         raise ValueError(
             f"Invalid windward_eq: '{value}'. "
-            "Expected one of: newtonian, modified_newtonian, tangent_wedge, shield."
+            "Expected one of: newtonian, modified_newtonian, tangent_wedge."
         )
     return eq
 
@@ -38,7 +38,7 @@ def _resolve_leeward_equation(value: str | None) -> str:
     if eq not in LEEWARD_EQUATION_VALUES:
         raise ValueError(
             f"Invalid leeward_eq: '{value}'. "
-            "Expected one of: shield, newtonian_mirror, prandtl_meyer."
+            "Expected one of: shield, prandtl_meyer."
         )
     return eq
 
@@ -428,10 +428,11 @@ def newtonian_dC_dA_vector(
     Mach: float | None = None,
     gamma: float | None = None,
 ) -> np.ndarray:
-    """Compute panel force-coefficient density vector ``dC/dA`` by Newtonian rule.
+    """Compute panel force-coefficient density vector ``dC/dA``.
 
-    Windward face (``n_in·Vhat > 0``): ``Cp = cp_max * (n_in·Vhat)^2``.
-    Leeward face or shielded face: ``Cp = 0``.
+    Windward faces use the configured windward equation.
+    Leeward faces use either `shield` (`Cp=0`) or `prandtl_meyer`.
+    Shielded faces are always zeroed.
     Pressure force acts along ``-n_out``.
     """
     if shielded:
@@ -446,8 +447,6 @@ def newtonian_dC_dA_vector(
     gamma_n = float(np.dot(Vhat, n_in))
 
     if gamma_n > 0.0:
-        if windward_eq == "shield":
-            return np.zeros(3, dtype=float)
         if windward_eq in {"newtonian", "modified_newtonian"}:
             cp = float(cp_max) * (gamma_n * gamma_n)
         else:
@@ -463,13 +462,10 @@ def newtonian_dC_dA_vector(
     else:
         if leeward_eq == "shield":
             return np.zeros(3, dtype=float)
-        if leeward_eq == "newtonian_mirror":
-            cp = float(cp_max) * (gamma_n * gamma_n)
-        else:
-            if Mach is None or gamma is None:
-                raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")
-            deltar = math.asin(max(-1.0, min(1.0, gamma_n)))
-            cp = prandtl_meyer_pressure_coefficient(Mach=float(Mach), gamma=float(gamma), deltar=deltar)
+        if Mach is None or gamma is None:
+            raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")
+        deltar = math.asin(max(-1.0, min(1.0, gamma_n)))
+        cp = prandtl_meyer_pressure_coefficient(Mach=float(Mach), gamma=float(gamma), deltar=deltar)
 
     return -(cp / float(Aref)) * n_out
 
@@ -539,9 +535,7 @@ def newtonian_dC_dA_vectors(
                 deltar=float(math.asin(float(gn))),
                 cp_cap=float(cp_max),
             )
-    if leeward_eq == "newtonian_mirror":
-        cp[~windward] = float(cp_max) * np.square(gamma_n[~windward])
-    elif leeward_eq == "prandtl_meyer":
+    if leeward_eq == "prandtl_meyer":
         if Mach is None or gamma is None:
             raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")
         leeward_idx = np.where(~windward)[0]
