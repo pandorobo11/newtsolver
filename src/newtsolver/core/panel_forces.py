@@ -137,13 +137,17 @@ def newtonian_dC_dA_vectors(
             raise ValueError("Mach and gamma are required for windward_eq=tangent_wedge.")
         windward_idx = np.where(windward)[0]
         gamma_n_win = np.clip(gamma_n[windward_idx], -1.0, 1.0)
-        for i, gn in zip(windward_idx, gamma_n_win):
-            cp[i] = tangent_wedge_pressure_coefficient(
+        deltar_win = np.arcsin(gamma_n_win)
+        unique_theta, inverse = np.unique(deltar_win, return_inverse=True)
+        cp_unique = np.empty(unique_theta.shape[0], dtype=float)
+        for j, theta in enumerate(unique_theta):
+            cp_unique[j] = tangent_wedge_pressure_coefficient(
                 Mach=float(Mach),
                 gamma=float(gamma),
-                deltar=float(math.asin(float(gn))),
+                deltar=float(theta),
                 cp_cap=float(cp_max),
             )
+        cp[windward_idx] = cp_unique[inverse]
     if leeward_eq == "prandtl_meyer":
         if Mach is None or gamma is None:
             raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")

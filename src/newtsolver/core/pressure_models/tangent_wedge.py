@@ -175,28 +175,33 @@ def _weak_oblique_shock_beta(Mach: float, gamma: float, theta: float) -> float |
                 y = 2.0 * r * math.cos((phi + 2.0 * math.pi * k) / 3.0)
                 roots_x.append(y - ba / 3.0)
 
-    mu = math.asin(1.0 / M)
-    x_max = 1.0 / math.tan(mu)
-    beta_candidates: list[tuple[float, float]] = []
+    x_max = math.sqrt(max(m2 - 1.0, 0.0))
+    weak_x: float | None = None
+    valid_x: list[float] = []
     for x in roots_x:
         if not math.isfinite(x):
             continue
         if not (0.0 < x < x_max):
             continue
-        beta = math.atan2(1.0, x)
-        if not (mu < beta < 0.5 * math.pi):
-            continue
-        res = abs(_oblique_theta_from_beta(M, g, beta) - t)
-        beta_candidates.append((x, res))
+        valid_x.append(x)
+        if weak_x is None or x > weak_x:
+            weak_x = x
 
-    if not beta_candidates:
+    if weak_x is None:
         return None
 
     # Weak branch has the smaller beta (larger cot(beta)).
-    beta_candidates.sort(key=lambda item: item[0], reverse=True)
-    for x, res in beta_candidates:
+    weak_beta = math.atan2(1.0, weak_x)
+    weak_res = abs(_oblique_theta_from_beta(M, g, weak_beta) - t)
+    if weak_res <= 1e-8:
+        return weak_beta
+    for x in valid_x:
+        if x == weak_x:
+            continue
+        beta = math.atan2(1.0, x)
+        res = abs(_oblique_theta_from_beta(M, g, beta) - t)
         if res <= 1e-8:
-            return math.atan2(1.0, x)
+            return beta
 
     # Above theta_max (or numerically degenerate), treat as detached.
     return None
@@ -228,14 +233,11 @@ def tangent_wedge_pressure_coefficient(
         return 0.0
 
     cap = float(cp_cap) if cp_cap is not None else modified_newtonian_cp_max(Mach=M, gamma=g)
-    beta = _weak_oblique_shock_beta(Mach=M, gamma=g, theta=theta)
-    if beta is None:
+    theta_max, cp_crit_raw = _tangent_wedge_detach_limit(M, g)
+    cp_crit = min(max(cp_crit_raw, 0.0), cap)
+    if theta > theta_max:
         # Detached regime: use a shifted modified-Newtonian curve that matches
         # Cp(theta_max)=Cp_crit and Cp(90deg)=Cp_cap.
-        theta_max, cp_crit_raw = _tangent_wedge_detach_limit(M, g)
-        cp_crit = min(max(cp_crit_raw, 0.0), cap)
-        if theta <= theta_max:
-            return cp_crit
         s = math.sin(theta)
         s2 = s * s
         s0 = math.sin(theta_max)
@@ -245,6 +247,10 @@ def tangent_wedge_pressure_coefficient(
         w = min(max(w, 0.0), 1.0)
         cp = cp_crit + (cap - cp_crit) * w
         return min(max(cp, 0.0), cap)
+
+    beta = _weak_oblique_shock_beta(Mach=M, gamma=g, theta=theta)
+    if beta is None:
+        return cp_crit
 
     mn1 = M * math.sin(beta)
     if mn1 <= 1.0:
