@@ -15,16 +15,12 @@ import pandas as pd
 from trimesh import ray as trimesh_ray
 
 from ..io.exporters import export_npz, export_vtp
+from .attitude import resolve_attitude_to_vhat, rot_y, stl_to_body
 from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
-from .panel_core import (
-    modified_newtonian_cp_max,
-    newtonian_dC_dA_vectors,
-    resolve_attitude_to_vhat,
-    rot_y,
-    stl_to_body,
-)
+from .panel_forces import newtonian_dC_dA_vectors
+from .pressure_models.modified_newtonian import modified_newtonian_cp_max
 from .shielding import compute_shield_mask_with_backend
 
 try:
