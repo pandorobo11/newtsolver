@@ -423,7 +423,7 @@ def run_case(row: dict, logfn) -> dict:
     Mach, gamma = _validate_mach_gamma(row)
     cp_max = (
         modified_newtonian_cp_max(Mach=Mach, gamma=gamma)
-        if windward_eq == "modified_newtonian"
+        if windward_eq in {"modified_newtonian", "tangent_wedge"}
         else 2.0
     )
     signature = build_case_signature(row)

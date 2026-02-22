@@ -88,7 +88,7 @@ POSITIVE_COLUMNS = {
 FLAG_COLUMNS = ["shielding_on", "save_vtp_on", "save_npz_on"]
 RAY_BACKEND_VALUES = {"auto", "rtree", "embree"}
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "shield"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge", "shield"}
 LEEWARD_EQUATION_VALUES = {"shield", "newtonian_mirror", "prandtl_meyer"}
 
 DEFAULTS = {
@@ -239,6 +239,9 @@ def _validate_flow_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
         invalid_modified = (df["windward_eq"] == "modified_newtonian") & (df["Mach"] <= 1.0)
         for idx in df.index[invalid_modified]:
             add_issue(int(idx), "Mach", "must be > 1 when windward_eq=modified_newtonian.")
+        invalid_tangent = (df["windward_eq"] == "tangent_wedge") & (df["Mach"] <= 1.0)
+        for idx in df.index[invalid_tangent]:
+            add_issue(int(idx), "Mach", "must be > 1 when windward_eq=tangent_wedge.")
     if "leeward_eq" in df.columns:
         invalid_pm = (df["leeward_eq"] == "prandtl_meyer") & (df["Mach"] <= 1.0)
         for idx in df.index[invalid_pm]:
@@ -291,7 +294,7 @@ def _validate_surface_equations(df: pd.DataFrame, add_issue: _AddIssueFn) -> Non
         add_issue(
             int(idx),
             "windward_eq",
-            "must be one of: newtonian, modified_newtonian, shield.",
+            "must be one of: newtonian, modified_newtonian, tangent_wedge, shield.",
         )
 
     df["leeward_eq"] = df["leeward_eq"].map(_normalize_leeward_eq)

@@ -315,6 +315,42 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertGreater(float(result_mn["CA"]), 0.0)
             self.assertLess(float(result_mn["CA"]), float(result_n["CA"]))
 
+    def test_run_case_tangent_wedge_changes_windward_magnitude(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
+            row_newtonian = {
+                "case_id": "test_case_newtonian_tw",
+                "stl_path": "samples/stl/cube.stl",
+                "stl_scale_m_per_unit": 1.0,
+                "alpha_deg": 0.0,
+                "beta_or_bank_deg": 0.0,
+                "ref_x_m": 0.0,
+                "ref_y_m": 0.0,
+                "ref_z_m": 0.0,
+                "Aref_m2": 1.0,
+                "Lref_Cl_m": 1.0,
+                "Lref_Cm_m": 1.0,
+                "Lref_Cn_m": 1.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
+                "windward_eq": "newtonian",
+                "leeward_eq": "shield",
+                "shielding_on": 0,
+                "save_vtp_on": 0,
+                "save_npz_on": 0,
+                "out_dir": td,
+            }
+            row_tangent_wedge = {
+                **row_newtonian,
+                "case_id": "test_case_tangent_wedge",
+                "windward_eq": "tangent_wedge",
+            }
+
+            result_n = run_case(row_newtonian, lambda _msg: None)
+            result_tw = run_case(row_tangent_wedge, lambda _msg: None)
+
+            self.assertGreater(float(result_tw["CA"]), 0.0)
+            self.assertLess(float(result_tw["CA"]), float(result_n["CA"]))
+
     def test_run_case_prandtl_meyer_changes_leeward_model(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row_shield = {

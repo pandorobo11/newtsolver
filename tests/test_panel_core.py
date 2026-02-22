@@ -14,6 +14,7 @@ from newtsolver.core.panel_core import (
     prandtl_meyer_pressure_coefficient,
     resolve_attitude_to_vhat,
     stl_to_body,
+    tangent_wedge_pressure_coefficient,
 )
 
 
@@ -87,6 +88,31 @@ class TestPanelCore(unittest.TestCase):
             windward_eq="modified_newtonian",
         )
         np.testing.assert_allclose(v, np.array([cp_max, 0.0, 0.0]), rtol=0.0, atol=1e-12)
+
+    def test_tangent_wedge_pressure_coefficient_is_positive_and_bounded(self):
+        cp_cap = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
+        cp = tangent_wedge_pressure_coefficient(
+            Mach=6.0,
+            gamma=1.4,
+            deltar=math.radians(10.0),
+            cp_cap=cp_cap,
+        )
+        self.assertGreater(cp, 0.0)
+        self.assertLess(cp, cp_cap)
+
+    def test_tangent_wedge_windward_generates_force(self):
+        v = newtonian_dC_dA_vector(
+            Vhat=np.array([1.0, 0.0, 0.0]),
+            n_out=np.array([-1.0, 0.0, 0.0]),
+            Aref=1.0,
+            shielded=False,
+            windward_eq="tangent_wedge",
+            Mach=6.0,
+            gamma=1.4,
+            cp_max=modified_newtonian_cp_max(Mach=6.0, gamma=1.4),
+        )
+        self.assertGreater(float(v[0]), 0.0)
+        self.assertLess(float(v[0]), 2.0)
 
     def test_prandtl_meyer_leeward_pressure_is_negative_and_bounded(self):
         cp = prandtl_meyer_pressure_coefficient(Mach=6.0, gamma=1.4, deltar=math.radians(-10.0))

@@ -82,7 +82,7 @@ Supported formats:
 | `stl_scale_m_per_unit` | Yes | float | m per STL unit | Scale factor applied to STL coordinates. Example: STL in mm -> `0.001`. |
 | `Mach` | Yes | float | Mach number | Freestream Mach number. Must be > 0. |
 | `gamma` | Yes | float | - | Ratio of specific heats. Must be > 1. |
-| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, or `shield` (`Cp=0`). |
+| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, `tangent_wedge`, or `shield` (`Cp=0`). |
 | `leeward_eq` | No | string | Leeward pressure equation | `shield` (default), `newtonian_mirror`, or `prandtl_meyer`. |
 | `alpha_deg` | Yes | deg | 1st attitude angle | Meaning depends on `attitude_input`. |
 | `beta_or_bank_deg` | Yes | deg | 2nd attitude angle | `beta` for `beta_tan`/`beta_sin`, `bank angle (phi)` for `bank`. |
@@ -109,6 +109,7 @@ Flow input rules:
 - `windward_eq`
   - `newtonian` (default): `Cp = 2 * (n_in·Vhat)^2` on windward faces.
   - `modified_newtonian`: `Cp = Cp_max(Mach, gamma) * (n_in·Vhat)^2` on windward faces.
+  - `tangent_wedge`: oblique-shock tangent-wedge compression model (`Mach > 1`) using `Mach`/`gamma`; detached cases are capped by `Cp_max`.
   - `shield`: windward contribution is forced to `Cp = 0`.
 - `leeward_eq`
   - `shield` (default): leeward contribution is forced to `Cp = 0`.
@@ -132,6 +133,7 @@ Model behavior:
 |---|---|---|
 | windward | `newtonian` | Simple impact-pressure model (`Cp ~ sin^2(delta)`), robust baseline. |
 | windward | `modified_newtonian` | Same shape as Newtonian, but scaled by `Cp_max(Mach,gamma)` (strong-shock corrected stagnation cap). |
+| windward | `tangent_wedge` | Uses weak oblique-shock relation for compression; detached regime falls back to `Cp_max`. |
 | leeward | `shield` | No suction contribution (`Cp=0`), conservative and stable default. |
 | leeward | `newtonian_mirror` | Symmetric Newtonian magnitude on leeward side; often overpredicts suction. |
 | leeward | `prandtl_meyer` | Isentropic expansion-based suction (`Cp<=0`) using `Mach` and `gamma`; physically richer for expansion surfaces. |
@@ -139,6 +141,7 @@ Model behavior:
 Typical combinations:
 - conservative engineering baseline: `windward_eq=newtonian`, `leeward_eq=shield`
 - stronger windward realism (high Mach): `windward_eq=modified_newtonian`, `leeward_eq=shield`
+- compression-side shock relation: `windward_eq=tangent_wedge`, `leeward_eq=shield` (or `prandtl_meyer`)
 - include leeward expansion effects: `windward_eq=newtonian` (or `modified_newtonian`), `leeward_eq=prandtl_meyer`
 
 ### Ray Backend (`ray_backend`)
