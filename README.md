@@ -62,7 +62,7 @@ uv run newtsolver-cli \
   --input samples/input_template.csv \
   --workers 4 \
   --output outputs/result.csv \
-  --cases baseline_cube baseline_double_plate_shield_on
+  --cases satellite_baseline_newtonian satellite_shield_on_newtonian
 ```
 
 ## Input File Specification (Common)
@@ -103,16 +103,6 @@ Supported formats:
 Flow input rules:
 - Provide `Mach` and `gamma` in every row.
 - Surface-equation defaults are `windward_eq=newtonian`, `leeward_eq=shield`.
-
-### Surface Equations (`windward_eq`, `leeward_eq`)
-
-- `windward_eq`
-  - `newtonian` (default): `Cp = 2 * (n_in·Vhat)^2` on windward faces.
-  - `modified_newtonian`: `Cp = Cp_max(Mach, gamma) * (n_in·Vhat)^2` on windward faces.
-  - `tangent_wedge`: oblique-shock tangent-wedge compression model (`Mach > 1`) using `Mach`/`gamma`; detached cases use a shifted modified-Newtonian mapping so `Cp(theta_max)` and `Cp(90 deg)=Cp_max` are both matched.
-- `leeward_eq`
-  - `shield` (default): leeward contribution is forced to `Cp = 0`.
-  - `prandtl_meyer`: applies Prandtl-Meyer expansion pressure from freestream `Mach`/`gamma` and local deflection (`Cp <= 0`).
 
 ### Windward / Leeward Method Guide
 
@@ -227,7 +217,7 @@ Examples:
 uv run newtsolver-cli --input samples/input_template.csv
 
 # Run selected cases with 4 workers
-uv run newtsolver-cli --input samples/input_template.csv -j 4 --cases baseline_cube baseline_double_plate_shield_on
+uv run newtsolver-cli --input samples/input_template.csv -j 4 --cases satellite_baseline_newtonian satellite_shield_on_newtonian
 
 # Specify output path
 uv run newtsolver-cli --input samples/input_template.csv -o outputs/custom_result.csv
