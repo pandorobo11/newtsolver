@@ -8,6 +8,7 @@ import numpy as np
 
 from .pressure_models import (
     prandtl_meyer_pressure_coefficient,
+    prandtl_meyer_pressure_coefficients,
     tangent_wedge_pressure_coefficient,
 )
 
@@ -148,12 +149,12 @@ def newtonian_dC_dA_vectors(
             raise ValueError("Mach and gamma are required for leeward_eq=prandtl_meyer.")
         leeward_idx = np.where(~windward)[0]
         gamma_n_lee = np.clip(gamma_n[leeward_idx], -1.0, 1.0)
-        for i, gn in zip(leeward_idx, gamma_n_lee):
-            cp[i] = prandtl_meyer_pressure_coefficient(
-                Mach=float(Mach),
-                gamma=float(gamma),
-                deltar=float(math.asin(float(gn))),
-            )
+        deltar_lee = np.arcsin(gamma_n_lee)
+        cp[leeward_idx] = prandtl_meyer_pressure_coefficients(
+            Mach=float(Mach),
+            gamma=float(gamma),
+            deltar=deltar_lee,
+        )
 
     out_active = np.zeros_like(n_in)
     nonzero = np.abs(cp) > 0.0

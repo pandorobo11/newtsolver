@@ -110,3 +110,42 @@ def prandtl_meyer_pressure_coefficient(Mach: float, gamma: float, deltar: float)
     p2_p1 = bracket ** (-g / (g - 1.0))
     cp = (2.0 / (g * M1 * M1)) * (p2_p1 - 1.0)
     return max(cp, cp_vac)
+
+
+def prandtl_meyer_pressure_coefficients(Mach: float, gamma: float, deltar: np.ndarray) -> np.ndarray:
+    """Vectorized Prandtl-Meyer pressure coefficient evaluation.
+
+    Args:
+        Mach: Freestream Mach number (>1).
+        gamma: Ratio of specific heats (>1).
+        deltar: Local turning-angle array [rad] (negative for expansion).
+    """
+    M1 = float(Mach)
+    g = float(gamma)
+    d = np.asarray(deltar, dtype=float)
+    if M1 <= 1.0:
+        raise ValueError(f"prandtl_meyer requires Mach > 1, got {M1}")
+    if g <= 1.0:
+        raise ValueError(f"gamma must be > 1, got {g}")
+
+    out = np.zeros_like(d, dtype=float)
+    expansion = d < 0.0
+    if not np.any(expansion):
+        return out
+
+    nu1 = float(_prandtl_meyer_nu(np.array([M1], dtype=float), g)[0])
+    nu2 = nu1 - d[expansion]
+    nu_max = 0.5 * math.pi * (math.sqrt((g + 1.0) / (g - 1.0)) - 1.0)
+    cp_vac = -2.0 / (g * M1 * M1)
+
+    cp_exp = np.full_like(nu2, cp_vac, dtype=float)
+    finite = nu2 < nu_max
+    if np.any(finite):
+        M2 = _inverse_prandtl_meyer(nu2[finite], g)
+        bracket = (1.0 + 0.5 * (g - 1.0) * M2 * M2) / (1.0 + 0.5 * (g - 1.0) * M1 * M1)
+        p2_p1 = bracket ** (-g / (g - 1.0))
+        cp = (2.0 / (g * M1 * M1)) * (p2_p1 - 1.0)
+        cp_exp[finite] = np.maximum(cp, cp_vac)
+
+    out[expansion] = cp_exp
+    return out
