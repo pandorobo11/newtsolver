@@ -17,6 +17,8 @@ Output image (not tracked by git):
 - `outputs/cp_theta_tangent_wedge_vs_modified_newtonian.png`
 - tracked doc image: `docs/assets/cp_theta_tangent_wedge_vs_modified_newtonian.png`
 
+## Figure
+
 ![Cp vs Theta: Tangent Wedge vs Modified Newtonian](../assets/cp_theta_tangent_wedge_vs_modified_newtonian.png)
 
 ## Conditions
@@ -27,7 +29,9 @@ Output image (not tracked by git):
 ## Current Detached Handling
 
 - `theta <= theta_max`: tangent-wedge attached solution
-- `theta > theta_max`: smooth transition from `Cp(theta_max)` to `Cp_cap` at `theta=90 deg`
+- `theta > theta_max`: shifted modified-Newtonian continuation
+  - `Cp(theta_max)=Cp_crit`
+  - `Cp(90 deg)=Cp_cap`
 
 ## Key Observations
 

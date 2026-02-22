@@ -259,16 +259,19 @@ def tangent_wedge_pressure_coefficient(
     cap = float(cp_cap) if cp_cap is not None else modified_newtonian_cp_max(Mach=M, gamma=g)
     beta = _weak_oblique_shock_beta(Mach=M, gamma=g, theta=theta)
     if beta is None:
-        # Detached regime: smoothly bridge from attached-limit Cp(theta_max)
-        # to Cp_cap at theta=90 deg.
+        # Detached regime: use a shifted modified-Newtonian curve that matches
+        # Cp(theta_max)=Cp_crit and Cp(90deg)=Cp_cap.
         theta_max, cp_crit_raw = _tangent_wedge_detach_limit(M, g)
         cp_crit = min(max(cp_crit_raw, 0.0), cap)
         if theta <= theta_max:
             return cp_crit
-        denom = max(0.5 * math.pi - theta_max, 1e-12)
-        x = (theta - theta_max) / denom
-        x = min(max(x, 0.0), 1.0)
-        w = x * x * (3.0 - 2.0 * x)  # smoothstep
+        s = math.sin(theta)
+        s2 = s * s
+        s0 = math.sin(theta_max)
+        s0_2 = s0 * s0
+        denom = max(1.0 - s0_2, 1e-12)
+        w = (s2 - s0_2) / denom
+        w = min(max(w, 0.0), 1.0)
         cp = cp_crit + (cap - cp_crit) * w
         return min(max(cp, 0.0), cap)
 

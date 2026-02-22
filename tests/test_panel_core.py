@@ -121,6 +121,28 @@ class TestPanelCore(unittest.TestCase):
         )
         self.assertGreaterEqual(cp_after + 1e-12, cp_before)
 
+    def test_tangent_wedge_detached_uses_shifted_modified_newtonian(self):
+        mach = 2.0
+        gamma = 1.4
+        cp_cap = modified_newtonian_cp_max(Mach=mach, gamma=gamma)
+        theta_max, cp_crit = _tangent_wedge_detach_limit(mach, gamma)
+        theta = math.radians(40.0)
+        self.assertGreater(theta, theta_max)
+
+        cp = tangent_wedge_pressure_coefficient(
+            Mach=mach,
+            gamma=gamma,
+            deltar=theta,
+            cp_cap=cp_cap,
+        )
+
+        s2 = math.sin(theta) ** 2
+        s0_2 = math.sin(theta_max) ** 2
+        w = (s2 - s0_2) / max(1.0 - s0_2, 1e-12)
+        w = min(max(w, 0.0), 1.0)
+        expected = cp_crit + (cp_cap - cp_crit) * w
+        self.assertAlmostEqual(cp, expected, places=12)
+
     def test_tangent_wedge_windward_generates_force(self):
         v = newtonian_dC_dA_vector(
             Vhat=np.array([1.0, 0.0, 0.0]),
