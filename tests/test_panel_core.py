@@ -15,11 +15,27 @@ from newtsolver.core.panel_core import (
     prandtl_meyer_pressure_coefficient,
     resolve_attitude_to_vhat,
     stl_to_body,
-    tangent_wedge_pressure_coefficient,
 )
+from newtsolver.core.pressure_models.tangent_wedge import tangent_wedge_pressure_coefficients
 
 
 class TestPanelCore(unittest.TestCase):
+    @staticmethod
+    def _tangent_wedge_cp_scalar(
+        mach: float,
+        gamma: float,
+        deltar: float,
+        cp_cap: float,
+    ) -> float:
+        return float(
+            tangent_wedge_pressure_coefficients(
+                Mach=mach,
+                gamma=gamma,
+                deltar=np.array([deltar], dtype=float),
+                cp_cap=cp_cap,
+            )[0]
+        )
+
     def test_vhat_matches_equivalent_tan_form(self):
         angles = [(-70.0, -30.0), (-25.0, 10.0), (0.0, 0.0), (35.0, -15.0), (70.0, 30.0)]
         for alpha_deg, beta_deg in angles:
@@ -72,8 +88,8 @@ class TestPanelCore(unittest.TestCase):
 
     def test_tangent_wedge_pressure_coefficient_is_positive_and_bounded(self):
         cp_cap = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
-        cp = tangent_wedge_pressure_coefficient(
-            Mach=6.0,
+        cp = self._tangent_wedge_cp_scalar(
+            mach=6.0,
             gamma=1.4,
             deltar=math.radians(10.0),
             cp_cap=cp_cap,
@@ -88,8 +104,8 @@ class TestPanelCore(unittest.TestCase):
         cp_cap = modified_newtonian_cp_max(Mach=mach, gamma=gamma)
         theta_max, cp_crit = _tangent_wedge_detach_limit(mach, gamma)
 
-        cp = tangent_wedge_pressure_coefficient(
-            Mach=mach,
+        cp = self._tangent_wedge_cp_scalar(
+            mach=mach,
             gamma=gamma,
             deltar=theta,
             cp_cap=cp_cap,
@@ -98,8 +114,8 @@ class TestPanelCore(unittest.TestCase):
         self.assertLess(cp, cp_cap)
 
         # At 90 deg, detached bridge should reach Cp_cap.
-        cp_90 = tangent_wedge_pressure_coefficient(
-            Mach=mach,
+        cp_90 = self._tangent_wedge_cp_scalar(
+            mach=mach,
             gamma=gamma,
             deltar=math.radians(90.0),
             cp_cap=cp_cap,
@@ -107,14 +123,14 @@ class TestPanelCore(unittest.TestCase):
         self.assertAlmostEqual(cp_90, cp_cap, places=12)
 
         # No drop at detach boundary.
-        cp_before = tangent_wedge_pressure_coefficient(
-            Mach=mach,
+        cp_before = self._tangent_wedge_cp_scalar(
+            mach=mach,
             gamma=gamma,
             deltar=theta_max * (1.0 - 1e-6),
             cp_cap=cp_cap,
         )
-        cp_after = tangent_wedge_pressure_coefficient(
-            Mach=mach,
+        cp_after = self._tangent_wedge_cp_scalar(
+            mach=mach,
             gamma=gamma,
             deltar=theta_max * (1.0 + 1e-6),
             cp_cap=cp_cap,
@@ -129,8 +145,8 @@ class TestPanelCore(unittest.TestCase):
         theta = math.radians(40.0)
         self.assertGreater(theta, theta_max)
 
-        cp = tangent_wedge_pressure_coefficient(
-            Mach=mach,
+        cp = self._tangent_wedge_cp_scalar(
+            mach=mach,
             gamma=gamma,
             deltar=theta,
             cp_cap=cp_cap,
@@ -156,6 +172,42 @@ class TestPanelCore(unittest.TestCase):
         )
         self.assertGreater(float(v[0]), 0.0)
         self.assertLess(float(v[0]), 2.0)
+
+    def test_tangent_wedge_vectorized_matches_singleton_evaluation(self):
+        mach = 6.0
+        gamma = 1.4
+        cp_cap = modified_newtonian_cp_max(Mach=mach, gamma=gamma)
+        deltar = np.array(
+            [
+                math.radians(-15.0),
+                0.0,
+                math.radians(2.0),
+                math.radians(10.0),
+                math.radians(30.0),
+                math.radians(60.0),
+                math.radians(85.0),
+            ],
+            dtype=float,
+        )
+        cp_vec = tangent_wedge_pressure_coefficients(
+            Mach=mach,
+            gamma=gamma,
+            deltar=deltar,
+            cp_cap=cp_cap,
+        )
+        cp_ref = np.array(
+            [
+                self._tangent_wedge_cp_scalar(
+                    mach=mach,
+                    gamma=gamma,
+                    deltar=float(theta),
+                    cp_cap=cp_cap,
+                )
+                for theta in deltar
+            ],
+            dtype=float,
+        )
+        np.testing.assert_allclose(cp_vec, cp_ref, rtol=0.0, atol=1e-12)
 
     def test_removed_surface_equations_are_rejected(self):
         with self.assertRaises(ValueError):

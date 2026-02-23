@@ -10,8 +10,8 @@ from .prandtl_meyer import (
 from .tangent_wedge import (
     _oblique_theta_from_beta,
     _tangent_wedge_detach_limit,
-    _weak_oblique_shock_beta,
-    tangent_wedge_pressure_coefficient,
+    _weak_oblique_shock_beta_array,
+    tangent_wedge_pressure_coefficients,
 )
 
 __all__ = [
@@ -22,6 +22,6 @@ __all__ = [
     "prandtl_meyer_pressure_coefficients",
     "_oblique_theta_from_beta",
     "_tangent_wedge_detach_limit",
-    "_weak_oblique_shock_beta",
-    "tangent_wedge_pressure_coefficient",
+    "_weak_oblique_shock_beta_array",
+    "tangent_wedge_pressure_coefficients",
 ]
