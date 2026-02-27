@@ -194,6 +194,13 @@ class TestIoCasesValidation(unittest.TestCase):
             loaded = read_cases(str(csv_path))
             self.assertEqual(str(loaded.loc[0, "windward_eq"]), "tangent_wedge")
 
+            row_eq_tc = self._base_row("mesh.stl")
+            row_eq_tc["windward_eq"] = "tangent_cone"
+            row_eq_tc["Mach"] = 2.0
+            pd.DataFrame([row_eq_tc]).to_csv(csv_path, index=False)
+            loaded = read_cases(str(csv_path))
+            self.assertEqual(str(loaded.loc[0, "windward_eq"]), "tangent_cone")
+
             row_eq_bad = self._base_row("mesh.stl")
             row_eq_bad["windward_eq"] = "invalid_windward"
             pd.DataFrame([row_eq_bad]).to_csv(csv_path, index=False)
@@ -212,6 +219,13 @@ class TestIoCasesValidation(unittest.TestCase):
             row_eq_tw_bad["Mach"] = 1.0
             pd.DataFrame([row_eq_tw_bad]).to_csv(csv_path, index=False)
             with self.assertRaisesRegex(InputValidationError, "windward_eq=tangent_wedge"):
+                read_cases(str(csv_path))
+
+            row_eq_tc_bad = self._base_row("mesh.stl")
+            row_eq_tc_bad["windward_eq"] = "tangent_cone"
+            row_eq_tc_bad["Mach"] = 1.0
+            pd.DataFrame([row_eq_tc_bad]).to_csv(csv_path, index=False)
+            with self.assertRaisesRegex(InputValidationError, "windward_eq=tangent_cone"):
                 read_cases(str(csv_path))
 
             row_eq_bad2 = self._base_row("mesh.stl")

@@ -8,6 +8,7 @@ import numpy as np
 from newtsolver.core.panel_core import (
     _inverse_prandtl_meyer,
     _prandtl_meyer_nu,
+    _tangent_cone_detach_limit,
     _tangent_wedge_detach_limit,
     modified_newtonian_cp_max,
     newtonian_dC_dA_vector,
@@ -16,6 +17,7 @@ from newtsolver.core.panel_core import (
     resolve_attitude_to_vhat,
     stl_to_body,
 )
+from newtsolver.core.pressure_models.tangent_cone import tangent_cone_pressure_coefficients
 from newtsolver.core.pressure_models.tangent_wedge import tangent_wedge_pressure_coefficients
 
 
@@ -29,6 +31,22 @@ class TestPanelCore(unittest.TestCase):
     ) -> float:
         return float(
             tangent_wedge_pressure_coefficients(
+                Mach=mach,
+                gamma=gamma,
+                deltar=np.array([deltar], dtype=float),
+                cp_cap=cp_cap,
+            )[0]
+        )
+
+    @staticmethod
+    def _tangent_cone_cp_scalar(
+        mach: float,
+        gamma: float,
+        deltar: float,
+        cp_cap: float,
+    ) -> float:
+        return float(
+            tangent_cone_pressure_coefficients(
                 Mach=mach,
                 gamma=gamma,
                 deltar=np.array([deltar], dtype=float),
@@ -208,6 +226,92 @@ class TestPanelCore(unittest.TestCase):
             dtype=float,
         )
         np.testing.assert_allclose(cp_vec, cp_ref, rtol=0.0, atol=1e-12)
+
+    def test_tangent_cone_pressure_coefficient_is_positive_and_bounded(self):
+        cp_cap = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
+        cp = self._tangent_cone_cp_scalar(
+            mach=6.0,
+            gamma=1.4,
+            deltar=math.radians(10.0),
+            cp_cap=cp_cap,
+        )
+        self.assertGreater(cp, 0.0)
+        self.assertLess(cp, cp_cap)
+
+    def test_tangent_cone_detached_bridges_to_cp_cap(self):
+        mach = 6.0
+        gamma = 1.4
+        cp_cap = modified_newtonian_cp_max(Mach=mach, gamma=gamma)
+        theta_max, cp_crit = _tangent_cone_detach_limit(mach, gamma)
+        theta = min(theta_max + math.radians(5.0), math.radians(85.0))
+
+        cp = self._tangent_cone_cp_scalar(
+            mach=mach,
+            gamma=gamma,
+            deltar=theta,
+            cp_cap=cp_cap,
+        )
+        self.assertGreater(cp, cp_crit)
+        self.assertLess(cp, cp_cap)
+
+        cp_90 = self._tangent_cone_cp_scalar(
+            mach=mach,
+            gamma=gamma,
+            deltar=math.radians(90.0),
+            cp_cap=cp_cap,
+        )
+        self.assertAlmostEqual(cp_90, cp_cap, places=12)
+
+    def test_tangent_cone_vectorized_matches_singleton_evaluation(self):
+        mach = 6.0
+        gamma = 1.4
+        cp_cap = modified_newtonian_cp_max(Mach=mach, gamma=gamma)
+        deltar = np.array(
+            [
+                math.radians(-20.0),
+                0.0,
+                math.radians(2.0),
+                math.radians(8.0),
+                math.radians(15.0),
+                math.radians(25.0),
+                math.radians(40.0),
+                math.radians(75.0),
+            ],
+            dtype=float,
+        )
+        cp_vec = tangent_cone_pressure_coefficients(
+            Mach=mach,
+            gamma=gamma,
+            deltar=deltar,
+            cp_cap=cp_cap,
+        )
+        cp_ref = np.array(
+            [
+                self._tangent_cone_cp_scalar(
+                    mach=mach,
+                    gamma=gamma,
+                    deltar=float(theta),
+                    cp_cap=cp_cap,
+                )
+                for theta in deltar
+            ],
+            dtype=float,
+        )
+        np.testing.assert_allclose(cp_vec, cp_ref, rtol=0.0, atol=1e-12)
+
+    def test_tangent_cone_windward_generates_force(self):
+        v = newtonian_dC_dA_vector(
+            Vhat=np.array([1.0, 0.0, 0.0]),
+            n_out=np.array([-1.0, 0.0, 0.0]),
+            Aref=1.0,
+            shielded=False,
+            windward_eq="tangent_cone",
+            Mach=6.0,
+            gamma=1.4,
+            cp_max=modified_newtonian_cp_max(Mach=6.0, gamma=1.4),
+        )
+        self.assertGreater(float(v[0]), 0.0)
+        self.assertLess(float(v[0]), 2.0)
 
     def test_removed_surface_equations_are_rejected(self):
         with self.assertRaises(ValueError):

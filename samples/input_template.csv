@@ -2,8 +2,10 @@ case_id,stl_path,stl_scale_m_per_unit,Mach,gamma,windward_eq,leeward_eq,alpha_de
 satellite_baseline_newtonian,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,0,0,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 satellite_modified_newtonian,stl/satellite.stl,0.001,8.3666,1.4,modified_newtonian,shield,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 satellite_tangent_wedge,stl/satellite.stl,0.001,8.3666,1.4,tangent_wedge,shield,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
+satellite_tangent_cone,stl/satellite.stl,0.001,8.3666,1.4,tangent_cone,shield,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 satellite_leeward_prandtl,stl/satellite.stl,0.001,8.3666,1.4,newtonian,prandtl_meyer,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 satellite_tangent_wedge_prandtl,stl/satellite.stl,0.001,8.3666,1.4,tangent_wedge,prandtl_meyer,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
+satellite_tangent_cone_prandtl,stl/satellite.stl,0.001,8.3666,1.4,tangent_cone,prandtl_meyer,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 satellite_shield_on_newtonian,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,1,auto,outputs/template,1,0
 satellite_shield_on_tangent_wedge,stl/satellite.stl,0.001,8.3666,1.4,tangent_wedge,shield,15,10,beta_tan,1,0,0,0.7853981633974483,1,1,1,1,auto,outputs/template,1,0
 satellite_beta_sin,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,10,5,beta_sin,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0

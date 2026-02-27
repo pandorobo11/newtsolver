@@ -13,6 +13,10 @@ from .tangent_wedge import (
     _weak_oblique_shock_beta_array,
     tangent_wedge_pressure_coefficients,
 )
+from .tangent_cone import (
+    _tangent_cone_detach_limit,
+    tangent_cone_pressure_coefficients,
+)
 
 __all__ = [
     "modified_newtonian_cp_max",
@@ -24,4 +28,6 @@ __all__ = [
     "_tangent_wedge_detach_limit",
     "_weak_oblique_shock_beta_array",
     "tangent_wedge_pressure_coefficients",
+    "_tangent_cone_detach_limit",
+    "tangent_cone_pressure_coefficients",
 ]

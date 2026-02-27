@@ -9,10 +9,11 @@ import numpy as np
 from .pressure_models import (
     prandtl_meyer_pressure_coefficient,
     prandtl_meyer_pressure_coefficients,
+    tangent_cone_pressure_coefficients,
     tangent_wedge_pressure_coefficients,
 )
 
-WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge"}
+WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge", "tangent_cone"}
 LEEWARD_EQUATION_VALUES = {"shield", "prandtl_meyer"}
 
 
@@ -22,7 +23,7 @@ def _resolve_windward_equation(value: str | None) -> str:
     if eq not in WINDWARD_EQUATION_VALUES:
         raise ValueError(
             f"Invalid windward_eq: '{value}'. "
-            "Expected one of: newtonian, modified_newtonian, tangent_wedge."
+            "Expected one of: newtonian, modified_newtonian, tangent_wedge, tangent_cone."
         )
     return eq
 
@@ -70,12 +71,24 @@ def newtonian_dC_dA_vector(
     if gamma_n > 0.0:
         if windward_eq in {"newtonian", "modified_newtonian"}:
             cp = float(cp_max) * (gamma_n * gamma_n)
-        else:
+        elif windward_eq == "tangent_wedge":
             if Mach is None or gamma is None:
                 raise ValueError("Mach and gamma are required for windward_eq=tangent_wedge.")
             deltar = math.asin(max(-1.0, min(1.0, gamma_n)))
             cp = float(
                 tangent_wedge_pressure_coefficients(
+                    Mach=float(Mach),
+                    gamma=float(gamma),
+                    deltar=np.array([deltar], dtype=float),
+                    cp_cap=float(cp_max),
+                )[0]
+            )
+        else:
+            if Mach is None or gamma is None:
+                raise ValueError("Mach and gamma are required for windward_eq=tangent_cone.")
+            deltar = math.asin(max(-1.0, min(1.0, gamma_n)))
+            cp = float(
+                tangent_cone_pressure_coefficients(
                     Mach=float(Mach),
                     gamma=float(gamma),
                     deltar=np.array([deltar], dtype=float),
@@ -141,6 +154,18 @@ def newtonian_dC_dA_vectors(
         gamma_n_win = np.clip(gamma_n[windward_idx], -1.0, 1.0)
         deltar_win = np.arcsin(gamma_n_win)
         cp[windward_idx] = tangent_wedge_pressure_coefficients(
+            Mach=float(Mach),
+            gamma=float(gamma),
+            deltar=deltar_win,
+            cp_cap=float(cp_max),
+        )
+    else:
+        if Mach is None or gamma is None:
+            raise ValueError("Mach and gamma are required for windward_eq=tangent_cone.")
+        windward_idx = np.where(windward)[0]
+        gamma_n_win = np.clip(gamma_n[windward_idx], -1.0, 1.0)
+        deltar_win = np.arcsin(gamma_n_win)
+        cp[windward_idx] = tangent_cone_pressure_coefficients(
             Mach=float(Mach),
             gamma=float(gamma),
             deltar=deltar_win,
