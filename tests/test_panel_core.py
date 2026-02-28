@@ -11,14 +11,13 @@ from newtsolver.core.panel_core import (
     _tangent_cone_detach_limit,
     _tangent_wedge_detach_limit,
     modified_newtonian_cp_max,
-    newtonian_dC_dA_vector,
-    newtonian_dC_dA_vectors,
-    prandtl_meyer_pressure_coefficient,
+    panel_force_density,
     resolve_attitude_to_vhat,
     stl_to_body,
 )
-from newtsolver.core.pressure_models.tangent_cone import tangent_cone_pressure_coefficients
-from newtsolver.core.pressure_models.tangent_wedge import tangent_wedge_pressure_coefficients
+from newtsolver.core.pressure_models.prandtl_meyer import prandtl_meyer_pressure_coefficient
+from newtsolver.core.pressure_models.tangent_cone import tangent_cone_pressure_coefficient
+from newtsolver.core.pressure_models.tangent_wedge import tangent_wedge_pressure_coefficient
 
 
 class TestPanelCore(unittest.TestCase):
@@ -30,7 +29,7 @@ class TestPanelCore(unittest.TestCase):
         cp_cap: float,
     ) -> float:
         return float(
-            tangent_wedge_pressure_coefficients(
+            tangent_wedge_pressure_coefficient(
                 Mach=mach,
                 gamma=gamma,
                 deltar=np.array([deltar], dtype=float),
@@ -46,13 +45,37 @@ class TestPanelCore(unittest.TestCase):
         cp_cap: float,
     ) -> float:
         return float(
-            tangent_cone_pressure_coefficients(
+            tangent_cone_pressure_coefficient(
                 Mach=mach,
                 gamma=gamma,
                 deltar=np.array([deltar], dtype=float),
                 cp_cap=cp_cap,
             )[0]
         )
+
+    @staticmethod
+    def _single_panel_force(
+        Vhat: np.ndarray,
+        n_out: np.ndarray,
+        Aref: float,
+        shielded: bool = False,
+        cp_max: float = 2.0,
+        windward_eq: str = "newtonian",
+        leeward_eq: str = "shield",
+        Mach: float | None = None,
+        gamma: float | None = None,
+    ) -> np.ndarray:
+        return panel_force_density(
+            Vhat=Vhat,
+            n_out=np.asarray(n_out, dtype=float).reshape(1, 3),
+            Aref=Aref,
+            shielded=np.array([bool(shielded)], dtype=bool),
+            cp_max=cp_max,
+            windward_eq=windward_eq,
+            leeward_eq=leeward_eq,
+            Mach=Mach,
+            gamma=gamma,
+        )[0]
 
     def test_vhat_matches_equivalent_tan_form(self):
         angles = [(-70.0, -30.0), (-25.0, 10.0), (0.0, 0.0), (35.0, -15.0), (70.0, 30.0)]
@@ -69,7 +92,7 @@ class TestPanelCore(unittest.TestCase):
             self.assertAlmostEqual(float(np.linalg.norm(v)), 1.0, places=12)
 
     def test_newtonian_vector_is_zero_when_shielded(self):
-        v = newtonian_dC_dA_vector(
+        v = self._single_panel_force(
             Vhat=np.array([1.0, 0.0, 0.0]),
             n_out=np.array([-1.0, 0.0, 0.0]),
             Aref=1.0,
@@ -78,7 +101,7 @@ class TestPanelCore(unittest.TestCase):
         np.testing.assert_allclose(v, np.zeros(3), rtol=0.0, atol=0.0)
 
     def test_newtonian_vector_is_zero_on_leeward_face(self):
-        v = newtonian_dC_dA_vector(
+        v = self._single_panel_force(
             Vhat=np.array([1.0, 0.0, 0.0]),
             n_out=np.array([1.0, 0.0, 0.0]),
             Aref=1.0,
@@ -94,7 +117,7 @@ class TestPanelCore(unittest.TestCase):
 
     def test_modified_newtonian_windward_uses_given_cp_max(self):
         cp_max = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
-        v = newtonian_dC_dA_vector(
+        v = self._single_panel_force(
             Vhat=np.array([1.0, 0.0, 0.0]),
             n_out=np.array([-1.0, 0.0, 0.0]),
             Aref=1.0,
@@ -178,7 +201,7 @@ class TestPanelCore(unittest.TestCase):
         self.assertAlmostEqual(cp, expected, places=12)
 
     def test_tangent_wedge_windward_generates_force(self):
-        v = newtonian_dC_dA_vector(
+        v = self._single_panel_force(
             Vhat=np.array([1.0, 0.0, 0.0]),
             n_out=np.array([-1.0, 0.0, 0.0]),
             Aref=1.0,
@@ -207,7 +230,7 @@ class TestPanelCore(unittest.TestCase):
             ],
             dtype=float,
         )
-        cp_vec = tangent_wedge_pressure_coefficients(
+        cp_vec = tangent_wedge_pressure_coefficient(
             Mach=mach,
             gamma=gamma,
             deltar=deltar,
@@ -279,7 +302,7 @@ class TestPanelCore(unittest.TestCase):
             ],
             dtype=float,
         )
-        cp_vec = tangent_cone_pressure_coefficients(
+        cp_vec = tangent_cone_pressure_coefficient(
             Mach=mach,
             gamma=gamma,
             deltar=deltar,
@@ -300,7 +323,7 @@ class TestPanelCore(unittest.TestCase):
         np.testing.assert_allclose(cp_vec, cp_ref, rtol=0.0, atol=1e-12)
 
     def test_tangent_cone_windward_generates_force(self):
-        v = newtonian_dC_dA_vector(
+        v = self._single_panel_force(
             Vhat=np.array([1.0, 0.0, 0.0]),
             n_out=np.array([-1.0, 0.0, 0.0]),
             Aref=1.0,
@@ -315,14 +338,14 @@ class TestPanelCore(unittest.TestCase):
 
     def test_removed_surface_equations_are_rejected(self):
         with self.assertRaises(ValueError):
-            newtonian_dC_dA_vector(
+            self._single_panel_force(
                 Vhat=np.array([1.0, 0.0, 0.0]),
                 n_out=np.array([-1.0, 0.0, 0.0]),
                 Aref=1.0,
                 windward_eq="shield",
             )
         with self.assertRaises(ValueError):
-            newtonian_dC_dA_vector(
+            self._single_panel_force(
                 Vhat=np.array([1.0, 0.0, 0.0]),
                 n_out=np.array([1.0, 0.0, 0.0]),
                 Aref=1.0,
@@ -330,13 +353,19 @@ class TestPanelCore(unittest.TestCase):
             )
 
     def test_prandtl_meyer_leeward_pressure_is_negative_and_bounded(self):
-        cp = prandtl_meyer_pressure_coefficient(Mach=6.0, gamma=1.4, deltar=math.radians(-10.0))
+        cp = float(
+            prandtl_meyer_pressure_coefficient(
+                Mach=6.0,
+                gamma=1.4,
+                deltar=np.array([math.radians(-10.0)], dtype=float),
+            )[0]
+        )
         cp_vac = -2.0 / (1.4 * 6.0 * 6.0)
         self.assertLess(cp, 0.0)
         self.assertGreaterEqual(cp, cp_vac)
 
     def test_leeward_prandtl_meyer_generates_force(self):
-        v = newtonian_dC_dA_vector(
+        v = self._single_panel_force(
             Vhat=np.array([1.0, 0.0, 0.0]),
             n_out=np.array([1.0, 0.0, 0.0]),
             Aref=1.0,
@@ -360,7 +389,7 @@ class TestPanelCore(unittest.TestCase):
         v_body = stl_to_body(v_stl)
         np.testing.assert_allclose(v_body, np.array([-2.0, -3.0, -4.5]), rtol=0.0, atol=0.0)
 
-    def test_newtonian_vectors_matches_scalar(self):
+    def test_newtonian_vectors_matches_single_panel_helper(self):
         Vhat, _, _, _ = resolve_attitude_to_vhat(10.0, -5.0, "beta_tan")
         n_out = np.array(
             [
@@ -372,7 +401,7 @@ class TestPanelCore(unittest.TestCase):
             dtype=float,
         )
         shielded = np.array([False, True, False, False], dtype=bool)
-        vec = newtonian_dC_dA_vectors(
+        vec = panel_force_density(
             Vhat=Vhat,
             n_out=n_out,
             Aref=2.0,
@@ -380,7 +409,7 @@ class TestPanelCore(unittest.TestCase):
         )
         ref = np.vstack(
             [
-                newtonian_dC_dA_vector(
+                self._single_panel_force(
                     Vhat=Vhat,
                     n_out=n_out[i],
                     Aref=2.0,

@@ -25,7 +25,7 @@ def _oblique_theta_from_beta(Mach: float, gamma: float, beta: float) -> float:
     return math.atan(rhs)
 
 
-def _oblique_theta_from_beta_array(Mach: float, gamma: float, beta: np.ndarray) -> np.ndarray:
+def _oblique_theta_from_beta_vec(Mach: float, gamma: float, beta: np.ndarray) -> np.ndarray:
     """Vectorized variant of :func:`_oblique_theta_from_beta`."""
     m2 = float(Mach) * float(Mach)
     g = float(gamma)
@@ -81,7 +81,7 @@ def _tangent_wedge_detach_limit(Mach: float, gamma: float) -> tuple[float, float
     return float(theta_max), float(max(cp_crit, 0.0))
 
 
-def _weak_oblique_shock_beta_array(Mach: float, gamma: float, theta: np.ndarray) -> np.ndarray:
+def _weak_oblique_shock_beta(Mach: float, gamma: float, theta: np.ndarray) -> np.ndarray:
     """Vectorized weak-shock ``beta`` [rad] solver.
 
     Returns ``NaN`` where no attached weak solution exists.
@@ -177,7 +177,7 @@ def _weak_oblique_shock_beta_array(Mach: float, gamma: float, theta: np.ndarray)
 
     beta = np.full_like(weak_x, np.nan, dtype=float)
     beta[weak_ok] = np.arctan2(1.0, weak_x[weak_ok])
-    theta_est = _oblique_theta_from_beta_array(M, g, beta)
+    theta_est = _oblique_theta_from_beta_vec(M, g, beta)
     residual = np.abs(theta_est - t_active)
     beta[residual > 1e-8] = np.nan
 
@@ -187,14 +187,24 @@ def _weak_oblique_shock_beta_array(Mach: float, gamma: float, theta: np.ndarray)
     return out
 
 
-def tangent_wedge_pressure_coefficients(
+def tangent_wedge_pressure_coefficient(
     Mach: float,
     gamma: float,
-    deltar: np.ndarray,
+    deltar: float | np.ndarray,
     *,
     cp_cap: float | None = None,
 ) -> np.ndarray:
-    """Vectorized tangent-wedge pressure coefficient evaluation."""
+    """Return tangent-wedge ``Cp`` for one or many turning angles.
+
+    Args:
+        Mach: Freestream Mach number (>1).
+        gamma: Ratio of specific heats (>1).
+        deltar: Local turning angle(s) [rad].
+        cp_cap: Optional ``Cp`` cap (defaults to modified-Newtonian ``Cp_max``).
+
+    Returns:
+        ``Cp`` array with the same shape as ``np.asarray(deltar)``.
+    """
     M = float(Mach)
     g = float(gamma)
     theta_all = np.asarray(deltar, dtype=float)
@@ -224,7 +234,7 @@ def tangent_wedge_pressure_coefficients(
 
     attached = ~detached
     if np.any(attached):
-        beta = _weak_oblique_shock_beta_array(Mach=M, gamma=g, theta=theta[attached])
+        beta = _weak_oblique_shock_beta(Mach=M, gamma=g, theta=theta[attached])
         cp_a = np.full(beta.shape, cp_crit, dtype=float)
         valid_beta = np.isfinite(beta)
         if np.any(valid_beta):

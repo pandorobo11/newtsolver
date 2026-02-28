@@ -17,24 +17,22 @@ from .panel_forces import (
     WINDWARD_EQUATION_VALUES,
     _resolve_leeward_equation,
     _resolve_windward_equation,
-    newtonian_dC_dA_vector,
-    newtonian_dC_dA_vectors,
+    panel_force_density,
 )
 from .pressure_models.modified_newtonian import modified_newtonian_cp_max
 from .pressure_models.prandtl_meyer import (
     _inverse_prandtl_meyer,
     _prandtl_meyer_nu,
-    prandtl_meyer_pressure_coefficient,
 )
 from .pressure_models.tangent_wedge import (
     _oblique_theta_from_beta,
     _tangent_wedge_detach_limit,
-    _weak_oblique_shock_beta_array,
-    tangent_wedge_pressure_coefficients,
+    _weak_oblique_shock_beta,
+    tangent_wedge_pressure_coefficient,
 )
 from .pressure_models.tangent_cone import (
     _tangent_cone_detach_limit,
-    tangent_cone_pressure_coefficients,
+    tangent_cone_pressure_coefficient,
 )
 
 __all__ = [
@@ -47,16 +45,14 @@ __all__ = [
     "modified_newtonian_cp_max",
     "_oblique_theta_from_beta",
     "_tangent_wedge_detach_limit",
-    "_weak_oblique_shock_beta_array",
-    "tangent_wedge_pressure_coefficients",
+    "_weak_oblique_shock_beta",
+    "tangent_wedge_pressure_coefficient",
     "_tangent_cone_detach_limit",
-    "tangent_cone_pressure_coefficients",
+    "tangent_cone_pressure_coefficient",
     "_prandtl_meyer_nu",
     "_inverse_prandtl_meyer",
-    "prandtl_meyer_pressure_coefficient",
     "resolve_attitude_to_vhat",
-    "newtonian_dC_dA_vector",
-    "newtonian_dC_dA_vectors",
+    "panel_force_density",
     "stl_to_body",
     "rot_y",
 ]

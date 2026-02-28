@@ -19,7 +19,7 @@ from .attitude import resolve_attitude_to_vhat, rot_y, stl_to_body
 from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
-from .panel_forces import newtonian_dC_dA_vectors
+from .panel_forces import panel_force_density
 from .pressure_models.modified_newtonian import modified_newtonian_cp_max
 from .shielding import compute_shield_mask_with_backend
 
@@ -123,7 +123,7 @@ def _compute_case_integrals(
     gamma: float,
 ) -> dict:
     """Compute per-face and integrated coefficients for one case."""
-    dC_dA_arr = newtonian_dC_dA_vectors(
+    dC_dA_arr = panel_force_density(
         Vhat=Vhat,
         n_out=normals_out_stl,
         Aref=Aref,

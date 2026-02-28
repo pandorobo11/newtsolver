@@ -191,14 +191,24 @@ def _tangent_cone_attached_pchip(Mach: float, gamma: float) -> PchipInterpolator
     return PchipInterpolator(theta, cp, extrapolate=True)
 
 
-def tangent_cone_pressure_coefficients(
+def tangent_cone_pressure_coefficient(
     Mach: float,
     gamma: float,
-    deltar: np.ndarray,
+    deltar: float | np.ndarray,
     *,
     cp_cap: float | None = None,
 ) -> np.ndarray:
-    """Vectorized tangent-cone pressure coefficient evaluation."""
+    """Return tangent-cone ``Cp`` for one or many turning angles.
+
+    Args:
+        Mach: Freestream Mach number (>1).
+        gamma: Ratio of specific heats (>1).
+        deltar: Local turning angle(s) [rad].
+        cp_cap: Optional ``Cp`` cap (defaults to modified-Newtonian ``Cp_max``).
+
+    Returns:
+        ``Cp`` array with the same shape as ``np.asarray(deltar)``.
+    """
     M = float(Mach)
     g = float(gamma)
     theta_all = np.asarray(deltar, dtype=float)
