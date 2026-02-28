@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark runtime and memory for ray-casting solver runs."""
+"""Benchmark runtime and memory for solver runs."""
 
 from __future__ import annotations
 
@@ -43,12 +43,12 @@ def _ru_maxrss_mib(resource_key: int) -> float:
 def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser for benchmark runs."""
     parser = argparse.ArgumentParser(
-        prog="benchmark_ray.py",
+        prog="benchmark_solver.py",
         description="Measure elapsed time and peak memory while running newtsolver cases.",
     )
     parser.add_argument(
         "--input",
-        default="samples/input_benchmark.csv",
+        default="samples/input_benchmark_basic.csv",
         help="Input cases file (.csv/.xlsx/.xlsm/.xls).",
     )
     parser.add_argument(

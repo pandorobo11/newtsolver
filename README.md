@@ -174,7 +174,8 @@ Sign convention in STL axes:
 ### Sample Files
 
 - `samples/input_template.csv`
-- `samples/input_benchmark.csv`
+- `samples/input_benchmark_basic.csv`
+- `samples/input_benchmark_matrix.csv`
 - `samples/stl/cube.stl`
 - `samples/stl/capsule.stl`
 - `samples/stl/plate.stl`
@@ -227,15 +228,16 @@ uv run newtsolver-cli --input samples/input_template.csv -o outputs/custom_resul
 
 ## Benchmark (Ray Casting)
 
-`samples/input_benchmark.csv` and `samples/stl/satellite.stl` are provided
+`samples/input_benchmark_basic.csv` and `samples/stl/satellite.stl` are provided
 for runtime/memory profiling of ray-casting runs.
+For the full windward/leeward matrix benchmark, use `samples/input_benchmark_matrix.csv`.
 
 ```bash
 # 1 run, 1 worker
-uv run python scripts/benchmark_ray.py
+uv run python scripts/benchmark_solver.py
 
 # 3 runs, 8 workers
-uv run python scripts/benchmark_ray.py --workers 8 --repeat 3
+uv run python scripts/benchmark_solver.py --workers 8 --repeat 3
 ```
 
 Main outputs:
