@@ -7,6 +7,7 @@ from functools import lru_cache
 
 import numpy as np
 from scipy.integrate import solve_ivp
+from scipy.interpolate import PchipInterpolator
 
 from .modified_newtonian import modified_newtonian_cp_max
 from .tangent_wedge import _oblique_theta_from_beta
@@ -183,6 +184,13 @@ def _tangent_cone_detach_limit(Mach: float, gamma: float) -> tuple[float, float]
     return float(theta[-1]), float(cp[-1])
 
 
+@lru_cache(maxsize=128)
+def _tangent_cone_attached_pchip(Mach: float, gamma: float) -> PchipInterpolator:
+    """Return cached PCHIP interpolator for attached ``theta -> Cp`` table."""
+    theta, cp = _tangent_cone_attached_table(float(Mach), float(gamma))
+    return PchipInterpolator(theta, cp, extrapolate=True)
+
+
 def tangent_cone_pressure_coefficients(
     Mach: float,
     gamma: float,
@@ -206,6 +214,7 @@ def tangent_cone_pressure_coefficients(
 
     cap = float(cp_cap) if cp_cap is not None else modified_newtonian_cp_max(Mach=M, gamma=g)
     theta_table, cp_table = _tangent_cone_attached_table(M, g)
+    pchip = _tangent_cone_attached_pchip(M, g)
     theta_max = float(theta_table[-1])
     cp_crit = float(min(max(cp_table[-1], 0.0), cap))
 
@@ -213,7 +222,7 @@ def tangent_cone_pressure_coefficients(
     cp_w = np.zeros_like(theta, dtype=float)
     attached = theta <= theta_max
     if np.any(attached):
-        cp_a = np.interp(theta[attached], theta_table, cp_table, left=0.0, right=cp_crit)
+        cp_a = pchip(theta[attached])
         cp_w[attached] = np.clip(cp_a, 0.0, cap)
 
     detached = ~attached
