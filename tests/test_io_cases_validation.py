@@ -89,6 +89,39 @@ class TestIoCasesValidation(unittest.TestCase):
             actual = str(loaded.loc[0, "stl_path"]).split(";")
             self.assertEqual(actual, [str(stl1.resolve()), str(stl2.resolve())])
 
+    def test_read_cases_accepts_per_stl_surface_equation_lists(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_per_stl_eq_") as td:
+            td_path = Path(td)
+            stl1 = td_path / "a.stl"
+            stl2 = td_path / "b.stl"
+            stl1.write_text("solid a\nendsolid a\n", encoding="utf-8")
+            stl2.write_text("solid b\nendsolid b\n", encoding="utf-8")
+            csv_path = td_path / "input.csv"
+
+            row = self._base_row("a.stl;b.stl")
+            row["windward_eq"] = "tangent_cone;newtonian"
+            row["leeward_eq"] = "prandtl_meyer;shield"
+            pd.DataFrame([row]).to_csv(csv_path, index=False)
+
+            loaded = read_cases(str(csv_path))
+            self.assertEqual(str(loaded.loc[0, "windward_eq"]), "tangent_cone;newtonian")
+            self.assertEqual(str(loaded.loc[0, "leeward_eq"]), "prandtl_meyer;shield")
+
+    def test_read_cases_rejects_per_stl_surface_equation_length_mismatch(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_io_per_stl_eq_bad_") as td:
+            td_path = Path(td)
+            stl1 = td_path / "a.stl"
+            stl2 = td_path / "b.stl"
+            stl1.write_text("solid a\nendsolid a\n", encoding="utf-8")
+            stl2.write_text("solid b\nendsolid b\n", encoding="utf-8")
+            csv_path = td_path / "input.csv"
+
+            row = self._base_row("a.stl;b.stl")
+            row["windward_eq"] = "newtonian;modified_newtonian;tangent_wedge"
+            pd.DataFrame([row]).to_csv(csv_path, index=False)
+            with self.assertRaisesRegex(InputValidationError, "windward_eq"):
+                read_cases(str(csv_path))
+
     def test_read_cases_rejects_duplicate_case_id(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_io_dup_") as td:
             td_path = Path(td)

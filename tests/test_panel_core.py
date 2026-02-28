@@ -420,6 +420,27 @@ class TestPanelCore(unittest.TestCase):
         )
         np.testing.assert_allclose(vec, ref, rtol=0.0, atol=1e-13)
 
+    def test_panel_force_density_supports_per_component_surface_equations(self):
+        cp_cap = modified_newtonian_cp_max(Mach=6.0, gamma=1.4)
+        Vhat = np.array([1.0, 0.0, 0.0], dtype=float)
+        n_out = np.array([[-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]], dtype=float)
+        dC_dA = panel_force_density(
+            Vhat=Vhat,
+            n_out=n_out,
+            Aref=1.0,
+            shielded=False,
+            face_stl_index=np.array([0, 1], dtype=np.int32),
+            cp_max=cp_cap,
+            windward_eq="newtonian",
+            leeward_eq="shield",
+            windward_eq_by_component=["newtonian", "modified_newtonian"],
+            leeward_eq_by_component=["shield", "shield"],
+            Mach=6.0,
+            gamma=1.4,
+        )
+        self.assertAlmostEqual(float(dC_dA[0, 0]), 2.0, places=12)
+        self.assertAlmostEqual(float(dC_dA[1, 0]), cp_cap, places=12)
+
     def test_resolve_attitude_beta_tan_matches_direct(self):
         v1, a_t, b_t, mode = resolve_attitude_to_vhat(10.0, -5.0, "beta_tan")
         v2, _, _, _ = resolve_attitude_to_vhat(10.0, -5.0, "")

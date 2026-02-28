@@ -19,7 +19,11 @@ from .attitude import resolve_attitude_to_vhat, rot_y, stl_to_body
 from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
-from .panel_forces import panel_force_density
+from .panel_forces import (
+    _resolve_leeward_equation,
+    _resolve_windward_equation,
+    panel_force_density,
+)
 from .pressure_models.modified_newtonian import modified_newtonian_cp_max
 from .shielding import compute_shield_mask_with_backend
 
@@ -57,6 +61,35 @@ def _validate_mach_gamma(row: dict) -> tuple[float, float]:
     if gamma <= 1.0:
         raise ValueError(f"gamma must be > 1, got {gamma}")
     return Mach, gamma
+
+
+def _expand_component_equations(
+    raw_value: str | None,
+    *,
+    default_value: str,
+    resolver,
+    n_components: int,
+    field_name: str,
+) -> tuple[list[str], str]:
+    """Resolve one-or-many equation selectors into per-component list."""
+    raw = str(raw_value or "").strip()
+    if not raw:
+        tokens = [default_value]
+    else:
+        tokens = [p.strip() for p in raw.split(";")]
+        if any(t == "" for t in tokens):
+            raise ValueError(f"{field_name} must not contain empty ';' entries.")
+
+    if len(tokens) == 1:
+        resolved = resolver(tokens[0])
+        return [resolved] * n_components, resolved
+    if len(tokens) != n_components:
+        raise ValueError(
+            f"{field_name} must have 1 entry or {n_components} entries "
+            f"(to match stl_path), got {len(tokens)}."
+        )
+    resolved_tokens = [resolver(token) for token in tokens]
+    return resolved_tokens, ";".join(resolved_tokens)
 
 
 def _compute_force_coeffs(C_force_stl: np.ndarray, alpha_t_deg: float) -> dict[str, float]:
@@ -116,8 +149,8 @@ def _compute_case_integrals(
     Lref_Cn: float,
     shielded: np.ndarray,
     num_components: int,
-    windward_eq: str,
-    leeward_eq: str,
+    windward_eq_by_component: list[str],
+    leeward_eq_by_component: list[str],
     cp_max: float,
     Mach: float,
     gamma: float,
@@ -128,9 +161,12 @@ def _compute_case_integrals(
         n_out=normals_out_stl,
         Aref=Aref,
         shielded=shielded,
+        face_stl_index=face_stl_index,
         cp_max=cp_max,
-        windward_eq=windward_eq,
-        leeward_eq=leeward_eq,
+        windward_eq=windward_eq_by_component[0],
+        leeward_eq=leeward_eq_by_component[0],
+        windward_eq_by_component=windward_eq_by_component,
+        leeward_eq_by_component=leeward_eq_by_component,
         Mach=Mach,
         gamma=gamma,
     )
@@ -413,15 +449,9 @@ def run_case(row: dict, logfn) -> dict:
     save_npz = bool(int(row.get("save_npz_on", 0)))
     out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
-    windward_eq = str(row.get("windward_eq", "newtonian")).strip().lower() or "newtonian"
-    leeward_eq = str(row.get("leeward_eq", "shield")).strip().lower() or "shield"
-
     Mach, gamma = _validate_mach_gamma(row)
-    cp_max = (
-        modified_newtonian_cp_max(Mach=Mach, gamma=gamma)
-        if windward_eq in {"modified_newtonian", "tangent_wedge", "tangent_cone"}
-        else 2.0
-    )
+    raw_windward_eq = str(row.get("windward_eq", "newtonian"))
+    raw_leeward_eq = str(row.get("leeward_eq", "shield"))
     signature = build_case_signature(row)
 
     Vhat, alpha_t_deg, beta_t_deg, attitude_mode = resolve_attitude_to_vhat(
@@ -437,6 +467,28 @@ def run_case(row: dict, logfn) -> dict:
     areas = md.areas_m2
     face_stl_index = md.face_stl_index
     stl_paths_order = md.stl_paths_order
+    num_components = len(stl_paths_order)
+
+    windward_eq_by_component, windward_eq = _expand_component_equations(
+        raw_windward_eq,
+        default_value="newtonian",
+        resolver=_resolve_windward_equation,
+        n_components=num_components,
+        field_name="windward_eq",
+    )
+    leeward_eq_by_component, leeward_eq = _expand_component_equations(
+        raw_leeward_eq,
+        default_value="shield",
+        resolver=_resolve_leeward_equation,
+        n_components=num_components,
+        field_name="leeward_eq",
+    )
+    cp_max = (
+        modified_newtonian_cp_max(Mach=Mach, gamma=gamma)
+        if any(eq in {"modified_newtonian", "tangent_wedge", "tangent_cone"}
+               for eq in windward_eq_by_component)
+        else 2.0
+    )
 
     if shielding_on:
         shielded, ray_backend_used = compute_shield_mask_with_backend(
@@ -450,7 +502,6 @@ def run_case(row: dict, logfn) -> dict:
         ray_backend_used = "not_used"
 
     n_faces = len(areas)
-    num_components = len(stl_paths_order)
     calc = _compute_case_integrals(
         Vhat=Vhat,
         normals_out_stl=normals_out_stl,
@@ -465,8 +516,8 @@ def run_case(row: dict, logfn) -> dict:
         Lref_Cn=Lref_Cn,
         shielded=shielded,
         num_components=num_components,
-        windward_eq=windward_eq,
-        leeward_eq=leeward_eq,
+        windward_eq_by_component=windward_eq_by_component,
+        leeward_eq_by_component=leeward_eq_by_component,
         cp_max=cp_max,
         Mach=Mach,
         gamma=gamma,

@@ -612,6 +612,61 @@ class TestSolverPipeline(unittest.TestCase):
                     msg=coef,
                 )
 
+    def test_run_case_multi_stl_accepts_per_stl_equation_lists(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
+            row = {
+                "case_id": "multi_case_per_eq",
+                "stl_path": "samples/stl/cube.stl;samples/stl/plate_offset_x2.stl",
+                "stl_scale_m_per_unit": 1.0,
+                "alpha_deg": 5.0,
+                "beta_or_bank_deg": 0.0,
+                "ref_x_m": 0.0,
+                "ref_y_m": 0.0,
+                "ref_z_m": 0.0,
+                "Aref_m2": 1.0,
+                "Lref_Cl_m": 1.0,
+                "Lref_Cm_m": 1.0,
+                "Lref_Cn_m": 1.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
+                "windward_eq": "tangent_cone;newtonian",
+                "leeward_eq": "prandtl_meyer;shield",
+                "shielding_on": 0,
+                "save_vtp_on": 0,
+                "save_npz_on": 0,
+                "out_dir": td,
+            }
+            result = run_case(row, lambda _msg: None)
+            self.assertGreater(result["faces"], 0)
+            self.assertTrue(math.isfinite(float(result["CA"])))
+
+    def test_run_case_multi_stl_rejects_equation_list_length_mismatch(self):
+        with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
+            row = {
+                "case_id": "multi_case_bad_eq_len",
+                "stl_path": "samples/stl/cube.stl;samples/stl/plate_offset_x2.stl",
+                "stl_scale_m_per_unit": 1.0,
+                "alpha_deg": 5.0,
+                "beta_or_bank_deg": 0.0,
+                "ref_x_m": 0.0,
+                "ref_y_m": 0.0,
+                "ref_z_m": 0.0,
+                "Aref_m2": 1.0,
+                "Lref_Cl_m": 1.0,
+                "Lref_Cm_m": 1.0,
+                "Lref_Cn_m": 1.0,
+                "Mach": 6.0,
+                "gamma": 1.4,
+                "windward_eq": "newtonian;modified_newtonian;tangent_wedge",
+                "leeward_eq": "shield",
+                "shielding_on": 0,
+                "save_vtp_on": 0,
+                "save_npz_on": 0,
+                "out_dir": td,
+            }
+            with self.assertRaisesRegex(ValueError, "windward_eq"):
+                run_case(row, lambda _msg: None)
+
     def test_write_results_csv_keeps_component_rows(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             df = pd.DataFrame(

@@ -82,8 +82,8 @@ Supported formats:
 | `stl_scale_m_per_unit` | Yes | float | m per STL unit | Scale factor applied to STL coordinates. Example: STL in mm -> `0.001`. |
 | `Mach` | Yes | float | Mach number | Freestream Mach number. Must be > 0. |
 | `gamma` | Yes | float | - | Ratio of specific heats. Must be > 1. |
-| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, `tangent_wedge`, or `tangent_cone`. |
-| `leeward_eq` | No | string | Leeward pressure equation | `shield` (default) or `prandtl_meyer`. |
+| `windward_eq` | No | string | Windward pressure equation | `newtonian` (default), `modified_newtonian`, `tangent_wedge`, or `tangent_cone`. For multi-STL cases, you can provide `;`-separated values to assign per STL in `stl_path` order. |
+| `leeward_eq` | No | string | Leeward pressure equation | `shield` (default) or `prandtl_meyer`. For multi-STL cases, you can provide `;`-separated values to assign per STL in `stl_path` order. |
 | `alpha_deg` | Yes | deg | 1st attitude angle | Meaning depends on `attitude_input`. |
 | `beta_or_bank_deg` | Yes | deg | 2nd attitude angle | `beta` for `beta_tan`/`beta_sin`, `bank angle (phi)` for `bank`. |
 | `attitude_input` | No | string | Attitude-angle definition | `beta_tan` (default), `beta_sin`, `bank`. |
@@ -103,6 +103,9 @@ Supported formats:
 Flow input rules:
 - Provide `Mach` and `gamma` in every row.
 - Surface-equation defaults are `windward_eq=newtonian`, `leeward_eq=shield`.
+- For multi-STL rows (`stl_path` with `;`), `windward_eq` / `leeward_eq` accept either:
+  - one value (applied to all STLs), or
+  - exactly one value per STL (same `;` order as `stl_path`).
 
 ### Windward / Leeward Method Guide
 

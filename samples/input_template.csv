@@ -13,4 +13,5 @@ satellite_bank,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,15,30,bank,1,
 satellite_alpha_m10,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,-10,0,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 satellite_beta_p20,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,10,20,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template,1,0
 multi_stl_disjoint,stl/cube.stl;stl/plate_offset_x2.stl,1,5.97614,1.4,newtonian,shield,5,5,beta_tan,0,0,0,1,1,1,1,0,auto,outputs/template,1,0
+multi_stl_per_component_eq,stl/cube.stl;stl/plate_offset_x2.stl,1,5.97614,1.4,tangent_cone;newtonian,prandtl_meyer;shield,5,5,beta_tan,0,0,0,1,1,1,1,0,auto,outputs/template,1,0
 io_npz_only_satellite,stl/satellite.stl,0.001,8.3666,1.4,newtonian,shield,0,0,beta_tan,1,0,0,0.7853981633974483,1,1,1,0,auto,outputs/template_npz,0,1
