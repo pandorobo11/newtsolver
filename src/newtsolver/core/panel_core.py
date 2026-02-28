@@ -15,9 +15,11 @@ from .attitude import (
 from .panel_forces import (
     LEEWARD_EQUATION_VALUES,
     WINDWARD_EQUATION_VALUES,
-    _resolve_leeward_equation,
-    _resolve_windward_equation,
     panel_force_density,
+)
+from ..surface_equations import (
+    normalize_leeward_equation,
+    normalize_windward_equation,
 )
 from .pressure_models.modified_newtonian import modified_newtonian_cp_max
 from .pressure_models.prandtl_meyer import (
@@ -40,8 +42,8 @@ __all__ = [
     "WINDWARD_EQUATION_VALUES",
     "LEEWARD_EQUATION_VALUES",
     "_resolve_attitude_mode",
-    "_resolve_windward_equation",
-    "_resolve_leeward_equation",
+    "normalize_windward_equation",
+    "normalize_leeward_equation",
     "modified_newtonian_cp_max",
     "_oblique_theta_from_beta",
     "_tangent_wedge_detach_limit",

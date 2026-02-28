@@ -205,6 +205,36 @@ class TestSolverPipeline(unittest.TestCase):
         }
         self.assertEqual(build_case_signature(row_int), build_case_signature(row_float))
 
+    def test_build_case_signature_surface_equation_normalization(self):
+        row_a = {
+            "case_id": "sig_eq",
+            "stl_path": "samples/stl/cube.stl;samples/stl/plate.stl",
+            "stl_scale_m_per_unit": 1.0,
+            "Mach": 6.0,
+            "gamma": 1.4,
+            "windward_eq": "TANGENT_CONE;newtonian",
+            "leeward_eq": "PRANDTL_MEYER;SHIELD",
+            "alpha_deg": 5.0,
+            "beta_or_bank_deg": 0.0,
+            "attitude_input": "beta_tan",
+            "ref_x_m": 0.0,
+            "ref_y_m": 0.0,
+            "ref_z_m": 0.0,
+            "Aref_m2": 1.0,
+            "Lref_Cl_m": 1.0,
+            "Lref_Cm_m": 1.0,
+            "Lref_Cn_m": 1.0,
+            "shielding_on": 0,
+            "ray_backend": "auto",
+        }
+        row_b = {
+            **row_a,
+            "stl_path": " samples/stl/cube.stl ; samples/stl/plate.stl ",
+            "windward_eq": "tangent_cone;newtonian",
+            "leeward_eq": "prandtl_meyer;shield",
+        }
+        self.assertEqual(build_case_signature(row_a), build_case_signature(row_b))
+
     def test_run_case_basic_smoke(self):
         with tempfile.TemporaryDirectory(prefix="newtsolver_test_") as td:
             row = {

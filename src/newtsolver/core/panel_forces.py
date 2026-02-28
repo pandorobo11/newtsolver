@@ -4,37 +4,17 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..surface_equations import (
+    LEEWARD_EQUATION_VALUES,
+    WINDWARD_EQUATION_VALUES,
+    normalize_leeward_equation,
+    normalize_windward_equation,
+)
 from .pressure_models import (
     prandtl_meyer_pressure_coefficient,
     tangent_cone_pressure_coefficient,
     tangent_wedge_pressure_coefficient,
 )
-
-WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge", "tangent_cone"}
-LEEWARD_EQUATION_VALUES = {"shield", "prandtl_meyer"}
-
-
-def _resolve_windward_equation(value: str | None) -> str:
-    """Normalize windward equation selector to canonical keyword."""
-    eq = str(value or "").strip().lower() or "newtonian"
-    if eq not in WINDWARD_EQUATION_VALUES:
-        raise ValueError(
-            f"Invalid windward_eq: '{value}'. "
-            "Expected one of: newtonian, modified_newtonian, tangent_wedge, tangent_cone."
-        )
-    return eq
-
-
-def _resolve_leeward_equation(value: str | None) -> str:
-    """Normalize leeward equation selector to canonical keyword."""
-    eq = str(value or "").strip().lower() or "shield"
-    if eq not in LEEWARD_EQUATION_VALUES:
-        raise ValueError(
-            f"Invalid leeward_eq: '{value}'. "
-            "Expected one of: shield, prandtl_meyer."
-        )
-    return eq
-
 
 def panel_force_density(
     Vhat: np.ndarray,
@@ -90,8 +70,8 @@ def panel_force_density(
     if not np.any(active):
         return out
 
-    windward_eq_single = _resolve_windward_equation(windward_eq)
-    leeward_eq_single = _resolve_leeward_equation(leeward_eq)
+    windward_eq_single = normalize_windward_equation(windward_eq)
+    leeward_eq_single = normalize_leeward_equation(leeward_eq)
     if face_stl_index is None:
         comp_idx_all = np.zeros(n_faces, dtype=np.int32)
         n_components = 1
@@ -110,14 +90,14 @@ def panel_force_density(
     else:
         if len(windward_eq_by_component) != n_components:
             raise ValueError("windward_eq_by_component length must match component count.")
-        windward_models = [_resolve_windward_equation(eq) for eq in windward_eq_by_component]
+        windward_models = [normalize_windward_equation(eq) for eq in windward_eq_by_component]
 
     if leeward_eq_by_component is None:
         leeward_models = [leeward_eq_single] * n_components
     else:
         if len(leeward_eq_by_component) != n_components:
             raise ValueError("leeward_eq_by_component length must match component count.")
-        leeward_models = [_resolve_leeward_equation(eq) for eq in leeward_eq_by_component]
+        leeward_models = [normalize_leeward_equation(eq) for eq in leeward_eq_by_component]
 
     n_in = -n_out[active]
     gamma_n = n_in @ Vhat

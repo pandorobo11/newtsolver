@@ -15,15 +15,16 @@ import pandas as pd
 from trimesh import ray as trimesh_ray
 
 from ..io.exporters import export_npz, export_vtp
+from ..surface_equations import (
+    expand_equations_for_components,
+    normalize_leeward_equation,
+    normalize_windward_equation,
+)
 from .attitude import resolve_attitude_to_vhat, rot_y, stl_to_body
 from .case_signature import build_case_signature
 from .mesh_utils import load_meshes
 from .parallel_scheduler import iter_case_results_parallel, resolve_parallel_chunk_cases
-from .panel_forces import (
-    _resolve_leeward_equation,
-    _resolve_windward_equation,
-    panel_force_density,
-)
+from .panel_forces import panel_force_density
 from .pressure_models.modified_newtonian import modified_newtonian_cp_max
 from .shielding import compute_shield_mask_with_backend
 
@@ -61,35 +62,6 @@ def _validate_mach_gamma(row: dict) -> tuple[float, float]:
     if gamma <= 1.0:
         raise ValueError(f"gamma must be > 1, got {gamma}")
     return Mach, gamma
-
-
-def _expand_component_equations(
-    raw_value: str | None,
-    *,
-    default_value: str,
-    resolver,
-    n_components: int,
-    field_name: str,
-) -> tuple[list[str], str]:
-    """Resolve one-or-many equation selectors into per-component list."""
-    raw = str(raw_value or "").strip()
-    if not raw:
-        tokens = [default_value]
-    else:
-        tokens = [p.strip() for p in raw.split(";")]
-        if any(t == "" for t in tokens):
-            raise ValueError(f"{field_name} must not contain empty ';' entries.")
-
-    if len(tokens) == 1:
-        resolved = resolver(tokens[0])
-        return [resolved] * n_components, resolved
-    if len(tokens) != n_components:
-        raise ValueError(
-            f"{field_name} must have 1 entry or {n_components} entries "
-            f"(to match stl_path), got {len(tokens)}."
-        )
-    resolved_tokens = [resolver(token) for token in tokens]
-    return resolved_tokens, ";".join(resolved_tokens)
 
 
 def _compute_force_coeffs(C_force_stl: np.ndarray, alpha_t_deg: float) -> dict[str, float]:
@@ -469,17 +441,17 @@ def run_case(row: dict, logfn) -> dict:
     stl_paths_order = md.stl_paths_order
     num_components = len(stl_paths_order)
 
-    windward_eq_by_component, windward_eq = _expand_component_equations(
+    windward_eq_by_component, windward_eq = expand_equations_for_components(
         raw_windward_eq,
         default_value="newtonian",
-        resolver=_resolve_windward_equation,
+        resolver=normalize_windward_equation,
         n_components=num_components,
         field_name="windward_eq",
     )
-    leeward_eq_by_component, leeward_eq = _expand_component_equations(
+    leeward_eq_by_component, leeward_eq = expand_equations_for_components(
         raw_leeward_eq,
         default_value="shield",
-        resolver=_resolve_leeward_equation,
+        resolver=normalize_leeward_equation,
         n_components=num_components,
         field_name="leeward_eq",
     )

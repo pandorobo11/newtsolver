@@ -9,6 +9,13 @@ from typing import Callable
 import pandas as pd
 
 from ..common import is_filled
+from ..surface_equations import (
+    count_semicolon_entries,
+    expand_equations_for_components,
+    normalize_leeward_equation,
+    normalize_windward_equation,
+    split_semicolon_tokens,
+)
 
 REQUIRED = [
     "case_id",
@@ -88,8 +95,6 @@ POSITIVE_COLUMNS = {
 FLAG_COLUMNS = ["shielding_on", "save_vtp_on", "save_npz_on"]
 RAY_BACKEND_VALUES = {"auto", "rtree", "embree"}
 ATTITUDE_INPUT_VALUES = {"beta_tan", "beta_sin", "bank"}
-WINDWARD_EQUATION_VALUES = {"newtonian", "modified_newtonian", "tangent_wedge", "tangent_cone"}
-LEEWARD_EQUATION_VALUES = {"shield", "prandtl_meyer"}
 
 DEFAULTS = {
     "shielding_on": 0,
@@ -112,31 +117,12 @@ def _normalize_attitude_input(value) -> str:
 
 def _normalize_windward_eq(value) -> str:
     """Normalize windward equation selector to canonical keyword."""
-    raw = str(value or "").strip().lower()
-    if not raw:
-        return "newtonian"
-    return raw
+    return normalize_windward_equation(value)
 
 
 def _normalize_leeward_eq(value) -> str:
     """Normalize leeward equation selector to canonical keyword."""
-    raw = str(value or "").strip().lower()
-    if not raw:
-        return "shield"
-    return raw
-
-
-def _count_semicolon_entries(value) -> int:
-    """Count non-empty ';'-separated entries in one cell."""
-    return len([p.strip() for p in str(value or "").split(";") if p.strip()])
-
-
-def _split_semicolon_tokens(value) -> list[str]:
-    """Split one cell by ';' while preserving empty-token validation."""
-    raw = str(value or "").strip()
-    if not raw:
-        return []
-    return [p.strip() for p in raw.split(";")]
+    return normalize_leeward_equation(value)
 
 
 @dataclass(frozen=True)
@@ -250,7 +236,7 @@ def _validate_flow_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
         add_issue(int(idx), "gamma", "must be > 1.")
     if "windward_eq" in df.columns:
         for idx in df.index[df["Mach"] <= 1.0]:
-            tokens = {t.strip() for t in str(df.at[idx, "windward_eq"]).split(";") if t.strip()}
+            tokens = {t for t in split_semicolon_tokens(df.at[idx, "windward_eq"]) if t}
             if "modified_newtonian" in tokens:
                 add_issue(int(idx), "Mach", "must be > 1 when windward_eq=modified_newtonian.")
             if "tangent_wedge" in tokens:
@@ -259,7 +245,7 @@ def _validate_flow_inputs(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
                 add_issue(int(idx), "Mach", "must be > 1 when windward_eq=tangent_cone.")
     if "leeward_eq" in df.columns:
         for idx in df.index[df["Mach"] <= 1.0]:
-            tokens = {t.strip() for t in str(df.at[idx, "leeward_eq"]).split(";") if t.strip()}
+            tokens = {t for t in split_semicolon_tokens(df.at[idx, "leeward_eq"]) if t}
             if "prandtl_meyer" in tokens:
                 add_issue(int(idx), "Mach", "must be > 1 when leeward_eq=prandtl_meyer.")
 
@@ -305,63 +291,33 @@ def _validate_attitude_input(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
 def _validate_surface_equations(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:
     """Normalize and validate windward/leeward pressure-equation selectors."""
     for idx in df.index:
-        n_stl = max(_count_semicolon_entries(df.at[idx, "stl_path"]), 1)
+        n_stl = max(count_semicolon_entries(df.at[idx, "stl_path"]), 1)
 
-        windward_tokens = _split_semicolon_tokens(df.at[idx, "windward_eq"])
-        if not windward_tokens:
-            windward_tokens = ["newtonian"]
-        elif any(tok == "" for tok in windward_tokens):
-            add_issue(int(idx), "windward_eq", "must not contain empty ';' entries.")
-            continue
-        normalized_windward = [_normalize_windward_eq(tok) for tok in windward_tokens]
-        invalid_windward = [tok for tok in normalized_windward if tok not in WINDWARD_EQUATION_VALUES]
-        if invalid_windward:
-            add_issue(
-                int(idx),
-                "windward_eq",
-                "must be one of: newtonian, modified_newtonian, tangent_wedge, tangent_cone.",
+        try:
+            _windward_list, windward_canonical = expand_equations_for_components(
+                df.at[idx, "windward_eq"],
+                default_value="newtonian",
+                resolver=_normalize_windward_eq,
+                n_components=n_stl,
+                field_name="windward_eq",
             )
+            df.at[idx, "windward_eq"] = windward_canonical
+        except ValueError as e:
+            add_issue(int(idx), "windward_eq", str(e))
             continue
-        if len(normalized_windward) not in {1, n_stl}:
-            add_issue(
-                int(idx),
-                "windward_eq",
-                f"must have 1 entry or {n_stl} entries (to match stl_path).",
-            )
-            continue
-        df.at[idx, "windward_eq"] = (
-            normalized_windward[0]
-            if len(normalized_windward) == 1
-            else ";".join(normalized_windward)
-        )
 
-        leeward_tokens = _split_semicolon_tokens(df.at[idx, "leeward_eq"])
-        if not leeward_tokens:
-            leeward_tokens = ["shield"]
-        elif any(tok == "" for tok in leeward_tokens):
-            add_issue(int(idx), "leeward_eq", "must not contain empty ';' entries.")
-            continue
-        normalized_leeward = [_normalize_leeward_eq(tok) for tok in leeward_tokens]
-        invalid_leeward = [tok for tok in normalized_leeward if tok not in LEEWARD_EQUATION_VALUES]
-        if invalid_leeward:
-            add_issue(
-                int(idx),
-                "leeward_eq",
-                "must be one of: shield, prandtl_meyer.",
+        try:
+            _leeward_list, leeward_canonical = expand_equations_for_components(
+                df.at[idx, "leeward_eq"],
+                default_value="shield",
+                resolver=_normalize_leeward_eq,
+                n_components=n_stl,
+                field_name="leeward_eq",
             )
+            df.at[idx, "leeward_eq"] = leeward_canonical
+        except ValueError as e:
+            add_issue(int(idx), "leeward_eq", str(e))
             continue
-        if len(normalized_leeward) not in {1, n_stl}:
-            add_issue(
-                int(idx),
-                "leeward_eq",
-                f"must have 1 entry or {n_stl} entries (to match stl_path).",
-            )
-            continue
-        df.at[idx, "leeward_eq"] = (
-            normalized_leeward[0]
-            if len(normalized_leeward) == 1
-            else ";".join(normalized_leeward)
-        )
 
 
 def _validate_out_dir(df: pd.DataFrame, add_issue: _AddIssueFn) -> None:

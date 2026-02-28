@@ -6,6 +6,37 @@ import hashlib
 import json
 import math
 
+from ..surface_equations import (
+    count_semicolon_entries,
+    expand_equations_for_components,
+    normalize_leeward_equation,
+    normalize_windward_equation,
+    split_semicolon_tokens,
+)
+
+
+def _canonical_surface_equation_value(
+    raw_value,
+    *,
+    field_name: str,
+    default_value: str,
+    n_components: int,
+    resolver,
+) -> str:
+    """Return canonical one-or-many equation selector string for signatures."""
+    try:
+        _eq_list, canonical = expand_equations_for_components(
+            raw_value,
+            default_value=default_value,
+            resolver=resolver,
+            n_components=n_components,
+            field_name=field_name,
+        )
+        return canonical
+    except Exception:
+        raw = str(raw_value or "").strip().lower()
+        return raw or default_value
+
 
 def build_case_signature(row: dict) -> str:
     """Build a stable signature hash for case identity and cache validation.
@@ -62,6 +93,25 @@ def build_case_signature(row: dict) -> str:
                 return str(v)
         return str(v)
 
+    n_components = max(count_semicolon_entries(row.get("stl_path")), 1)
+    stl_tokens = [t for t in split_semicolon_tokens(row.get("stl_path")) if t]
+    canonical_stl = ";".join(stl_tokens) if stl_tokens else ""
+
     data = {k: norm_value(k, row.get(k)) for k in keys}
+    data["stl_path"] = canonical_stl
+    data["windward_eq"] = _canonical_surface_equation_value(
+        row.get("windward_eq"),
+        field_name="windward_eq",
+        default_value="newtonian",
+        n_components=n_components,
+        resolver=normalize_windward_equation,
+    )
+    data["leeward_eq"] = _canonical_surface_equation_value(
+        row.get("leeward_eq"),
+        field_name="leeward_eq",
+        default_value="shield",
+        n_components=n_components,
+        resolver=normalize_leeward_equation,
+    )
     payload = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
