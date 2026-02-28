@@ -6,13 +6,15 @@ import math
 from functools import lru_cache
 
 import numpy as np
+from scipy.integrate import solve_ivp
 
 from .modified_newtonian import modified_newtonian_cp_max
 from .tangent_wedge import _oblique_theta_from_beta
 
-_TM_DTHETA = -5.0e-4
-_TM_MAX_STEPS = 20000
 _TM_N_BETA = 220
+_TM_ODE_RTOL = 1.0e-8
+_TM_ODE_ATOL = 1.0e-10
+_TM_ODE_MAX_STEP = 2.0e-3
 
 
 def _nondim_speed_from_mach(Mach: float, gamma: float) -> float:
@@ -46,30 +48,13 @@ def _taylor_maccoll_rhs(theta: float, vr: float, vtheta: float, gamma: float) ->
     return float(dvr_dtheta), float(dvt_dtheta)
 
 
-def _rk4_step(theta: float, vr: float, vtheta: float, h: float, gamma: float) -> tuple[float, float]:
-    """Single RK4 step for the Taylor-Maccoll ODE."""
-    k1_vr, k1_vt = _taylor_maccoll_rhs(theta, vr, vtheta, gamma)
-    k2_vr, k2_vt = _taylor_maccoll_rhs(
-        theta + 0.5 * h,
-        vr + 0.5 * h * k1_vr,
-        vtheta + 0.5 * h * k1_vt,
-        gamma,
-    )
-    k3_vr, k3_vt = _taylor_maccoll_rhs(
-        theta + 0.5 * h,
-        vr + 0.5 * h * k2_vr,
-        vtheta + 0.5 * h * k2_vt,
-        gamma,
-    )
-    k4_vr, k4_vt = _taylor_maccoll_rhs(
-        theta + h,
-        vr + h * k3_vr,
-        vtheta + h * k3_vt,
-        gamma,
-    )
-    vr_next = vr + (h / 6.0) * (k1_vr + 2.0 * k2_vr + 2.0 * k3_vr + k4_vr)
-    vt_next = vtheta + (h / 6.0) * (k1_vt + 2.0 * k2_vt + 2.0 * k3_vt + k4_vt)
-    return float(vr_next), float(vt_next)
+def _taylor_maccoll_event_vtheta_zero(_theta: float, y: np.ndarray) -> float:
+    """Surface is reached when the circumferential velocity becomes zero."""
+    return float(y[1])
+
+
+_taylor_maccoll_event_vtheta_zero.terminal = True
+_taylor_maccoll_event_vtheta_zero.direction = 0
 
 
 def _integrate_taylor_maccoll_to_surface(
@@ -77,7 +62,10 @@ def _integrate_taylor_maccoll_to_surface(
     gamma: float,
     beta_s: float,
 ) -> tuple[float, float] | None:
-    """Integrate from shock to cone and return ``(theta_c, cp_c)``."""
+    """Integrate from shock to cone and return ``(theta_c, cp_c)``.
+
+    Uses ``scipy.integrate.solve_ivp(..., method="LSODA")`` for adaptive stepping.
+    """
     M = float(Mach)
     g = float(gamma)
     beta = float(beta_s)
@@ -103,40 +91,35 @@ def _integrate_taylor_maccoll_to_surface(
     angle = beta - delta
     vr = v2_prime * math.cos(angle)
     vtheta = -v2_prime * math.sin(angle)
-    theta = beta
+    try:
+        sol = solve_ivp(
+            fun=lambda theta, y: _taylor_maccoll_rhs(theta, float(y[0]), float(y[1]), g),
+            t_span=(beta, 1.0e-6),
+            y0=np.array([vr, vtheta], dtype=float),
+            method="LSODA",
+            rtol=_TM_ODE_RTOL,
+            atol=_TM_ODE_ATOL,
+            events=_taylor_maccoll_event_vtheta_zero,
+            max_step=_TM_ODE_MAX_STEP,
+        )
+    except Exception:
+        return None
 
-    for _ in range(_TM_MAX_STEPS):
-        if theta <= 1.0e-6:
-            break
-        if vtheta >= 0.0:
-            break
+    if (not sol.success) or (len(sol.t_events) == 0) or (len(sol.t_events[0]) == 0):
+        return None
 
-        vr_next, vt_next = _rk4_step(theta, vr, vtheta, _TM_DTHETA, g)
-        theta_next = theta + _TM_DTHETA
-        if not (math.isfinite(vr_next) and math.isfinite(vt_next)):
-            return None
-
-        if vt_next >= 0.0:
-            denom = vt_next - vtheta
-            frac = 0.0 if abs(denom) < 1.0e-14 else max(0.0, min(1.0, -vtheta / denom))
-            theta_c = theta + frac * _TM_DTHETA
-            vr_c = vr + frac * (vr_next - vr)
-            v_c = min(max(abs(vr_c), 1.0e-12), 1.0 - 1.0e-12)
-            m_c = _mach_from_nondim_speed(v_c, g)
-            if not math.isfinite(m_c) or m_c <= 0.0:
-                return None
-            p_c_p2 = ((1.0 + 0.5 * (g - 1.0) * m2 * m2) / (1.0 + 0.5 * (g - 1.0) * m_c * m_c)) ** (
-                g / (g - 1.0)
-            )
-            p_c_p1 = p2_p1 * p_c_p2
-            cp_c = (2.0 / (g * M * M)) * (p_c_p1 - 1.0)
-            return float(theta_c), float(max(cp_c, 0.0))
-
-        theta = theta_next
-        vr = vr_next
-        vtheta = vt_next
-
-    return None
+    theta_c = float(sol.t_events[0][0])
+    vr_c = float(sol.y_events[0][0][0])
+    v_c = min(max(abs(vr_c), 1.0e-12), 1.0 - 1.0e-12)
+    m_c = _mach_from_nondim_speed(v_c, g)
+    if not math.isfinite(m_c) or m_c <= 0.0:
+        return None
+    p_c_p2 = ((1.0 + 0.5 * (g - 1.0) * m2 * m2) / (1.0 + 0.5 * (g - 1.0) * m_c * m_c)) ** (
+        g / (g - 1.0)
+    )
+    p_c_p1 = p2_p1 * p_c_p2
+    cp_c = (2.0 / (g * M * M)) * (p_c_p1 - 1.0)
+    return float(theta_c), float(max(cp_c, 0.0))
 
 
 @lru_cache(maxsize=128)
