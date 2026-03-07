@@ -11,7 +11,7 @@ import pyvista as pv
 from PySide6 import QtCore, QtWidgets
 
 from ..core.solver import build_case_signature, run_cases
-from ..io.csv_out import append_results_csv, write_results_csv
+from ..io.csv_out import write_results_csv
 from ..io.io_cases import InputValidationError, read_cases
 
 
@@ -45,8 +45,8 @@ class _CaseRunWorker(QtCore.QObject):
             if self._out_path.exists():
                 self._out_path.unlink()
 
-            def on_chunk(chunk_df, done: int, total: int, is_final: bool):
-                append_results_csv(str(self._out_path), self._df_selected, chunk_df)
+            def on_chunk(snapshot_df, done: int, total: int, is_final: bool):
+                write_results_csv(str(self._out_path), self._df_selected, snapshot_df)
                 phase = "final" if is_final else "checkpoint"
                 self.log.emit(f"[SAVE] {phase} {done}/{total} -> {self._out_path}")
 

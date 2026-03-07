@@ -628,9 +628,10 @@ def run_cases(
         workers: Process count for case-level parallel execution.
         progress_cb: Optional callback receiving ``(done, total)``.
         cancel_cb: Optional callback returning ``True`` to request cancellation.
-        flush_every_cases: Optional case count for chunk callbacks.
-        chunk_cb: Optional callback receiving chunk dataframe and
-            ``(done, total, is_final_chunk)``.
+        flush_every_cases: Optional completed-case interval for checkpoint callbacks.
+        chunk_cb: Optional callback receiving a checkpoint snapshot dataframe in
+            input order plus ``(done, total, is_final_chunk)``. The snapshot
+            contains all completed cases so far, not just the latest delta.
 
     Returns:
         Dataframe of per-case summary results, preserving input row order.
@@ -646,29 +647,25 @@ def run_cases(
     exec_order = _build_execution_order(df)
 
     case_rows: list[list[dict] | None] = [None] * total
-    next_chunk_case_idx = 0
+    completed_since_emit = 0
 
     def _emit_chunk(force: bool = False) -> None:
-        nonlocal next_chunk_case_idx
+        nonlocal completed_since_emit
         if chunk_cb is None:
             return
         if not force and flush_every <= 0:
             return
-        ready_buckets: list[list[dict]] = []
-        scan_idx = next_chunk_case_idx
-        while scan_idx < total and case_rows[scan_idx] is not None:
-            ready_buckets.append(case_rows[scan_idx])
-            scan_idx += 1
-        if not ready_buckets:
+        if not force and completed_since_emit < flush_every:
             return
-        if not force and len(ready_buckets) < flush_every:
+        snapshot_buckets = [bucket for bucket in case_rows if bucket]
+        if not snapshot_buckets:
             return
-        chunk_rows: list[dict] = []
-        for bucket in ready_buckets:
-            chunk_rows.extend(bucket)
-        next_chunk_case_idx = scan_idx
-        chunk_df = pd.DataFrame(chunk_rows)
+        snapshot_rows: list[dict] = []
+        for bucket in snapshot_buckets:
+            snapshot_rows.extend(bucket)
+        chunk_df = pd.DataFrame(snapshot_rows)
         chunk_cb(chunk_df, done_count, total, bool(force))
+        completed_since_emit = 0
 
     if workers <= 1 or total <= 1:
         done_count = 0
@@ -681,6 +678,7 @@ def run_cases(
             expanded = _expand_case_rows(case_result)
             case_rows[i] = expanded
             done_count += 1
+            completed_since_emit += 1
             _emit_chunk(force=False)
             if progress_cb is not None:
                 progress_cb(done_count, total)
@@ -705,6 +703,7 @@ def run_cases(
         expanded = _expand_case_rows(case_result)
         case_rows[int(i)] = expanded
         done_count += 1
+        completed_since_emit += 1
         _emit_chunk(force=False)
         logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[int(i), 'case_id']}")
         if progress_cb is not None:
