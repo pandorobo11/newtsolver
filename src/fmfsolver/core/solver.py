@@ -645,26 +645,32 @@ def run_cases(
     _maybe_log_ray_accel_hint(logfn)
     exec_order = _build_execution_order(df)
 
-    chunk_rows: list[dict] = []
-    pending_cases = 0
+    case_rows: list[list[dict] | None] = [None] * total
+    next_chunk_case_idx = 0
 
     def _emit_chunk(force: bool = False) -> None:
-        nonlocal chunk_rows, pending_cases
+        nonlocal next_chunk_case_idx
         if chunk_cb is None:
-            return
-        if not chunk_rows:
             return
         if not force and flush_every <= 0:
             return
-        if not force and pending_cases < flush_every:
+        ready_buckets: list[list[dict]] = []
+        scan_idx = next_chunk_case_idx
+        while scan_idx < total and case_rows[scan_idx] is not None:
+            ready_buckets.append(case_rows[scan_idx])
+            scan_idx += 1
+        if not ready_buckets:
             return
+        if not force and len(ready_buckets) < flush_every:
+            return
+        chunk_rows: list[dict] = []
+        for bucket in ready_buckets:
+            chunk_rows.extend(bucket)
+        next_chunk_case_idx = scan_idx
         chunk_df = pd.DataFrame(chunk_rows)
         chunk_cb(chunk_df, done_count, total, bool(force))
-        chunk_rows = []
-        pending_cases = 0
 
     if workers <= 1 or total <= 1:
-        case_rows = [None] * total
         done_count = 0
         for run_idx, i in enumerate(exec_order, start=1):
             if cancel_cb is not None and cancel_cb():
@@ -675,8 +681,6 @@ def run_cases(
             expanded = _expand_case_rows(case_result)
             case_rows[i] = expanded
             done_count += 1
-            chunk_rows.extend(expanded)
-            pending_cases += 1
             _emit_chunk(force=False)
             if progress_cb is not None:
                 progress_cb(done_count, total)
@@ -688,7 +692,6 @@ def run_cases(
         return pd.DataFrame(rows)
 
     logfn(f"[RUN] Parallel execution with {workers} worker(s)")
-    case_rows = [None] * total
     done_count = 0
     chunk_cases = resolve_parallel_chunk_cases()
     for i, case_result in iter_case_results_parallel(
@@ -702,8 +705,6 @@ def run_cases(
         expanded = _expand_case_rows(case_result)
         case_rows[int(i)] = expanded
         done_count += 1
-        chunk_rows.extend(expanded)
-        pending_cases += 1
         _emit_chunk(force=False)
         logfn(f"[OK] ({done_count}/{total}) case_id={df.loc[int(i), 'case_id']}")
         if progress_cb is not None:

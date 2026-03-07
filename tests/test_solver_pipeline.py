@@ -437,6 +437,56 @@ class TestSolverPipeline(unittest.TestCase):
             self.assertEqual(len(res), 3)
             self.assertEqual(chunks, [(2, 3, False, 2), (3, 3, True, 1)])
 
+    def test_parallel_checkpoint_csv_keeps_input_order(self):
+        df = pd.DataFrame(
+            [
+                {"case_id": "case_a", "stl_path": "samples/stl/cube.stl"},
+                {"case_id": "case_b", "stl_path": "samples/stl/cube.stl"},
+                {"case_id": "case_c", "stl_path": "samples/stl/cube.stl"},
+            ]
+        )
+
+        def fake_iter(*_args, **_kwargs):
+            yield 1, {"case_id": "case_b", "scope": "total", "component_id": "", "CA": 2.0}
+            yield 0, {"case_id": "case_a", "scope": "total", "component_id": "", "CA": 1.0}
+            yield 2, {"case_id": "case_c", "scope": "total", "component_id": "", "CA": 3.0}
+
+        with tempfile.TemporaryDirectory(prefix="fmfsolver_checkpoint_") as td, patch(
+            "fmfsolver.core.solver.iter_case_results_parallel",
+            side_effect=fake_iter,
+        ):
+            out_csv = Path(td) / "checkpoint.csv"
+            chunks: list[tuple[int, int, bool, list[str]]] = []
+
+            run_cases(
+                df,
+                lambda _msg: None,
+                workers=2,
+                flush_every_cases=2,
+                chunk_cb=lambda chunk_df, done, total, is_final: (
+                    append_results_csv(str(out_csv), df, chunk_df),
+                    chunks.append(
+                        (
+                            done,
+                            total,
+                            is_final,
+                            chunk_df["case_id"].astype(str).tolist(),
+                        )
+                    ),
+                ),
+            )
+
+            out_df = pd.read_csv(out_csv)
+
+        self.assertEqual(
+            chunks,
+            [
+                (2, 3, False, ["case_a", "case_b"]),
+                (3, 3, True, ["case_c"]),
+            ],
+        )
+        self.assertEqual(out_df["case_id"].astype(str).tolist(), ["case_a", "case_b", "case_c"])
+
     def test_run_cases_multi_stl_emits_total_and_component_rows(self):
         with tempfile.TemporaryDirectory(prefix="fmfsolver_test_") as td:
             df = pd.DataFrame(
