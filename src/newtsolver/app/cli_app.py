@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from ..core.solver import run_cases
-from ..io.csv_out import append_results_csv, write_results_csv
+from ..io.csv_out import write_results_csv
 from ..io.io_cases import read_cases
 
 
@@ -105,8 +105,8 @@ def main(argv: list[str] | None = None) -> int:
         f"[RUN] cases={len(df_run)} workers={args.workers} input={input_path}",
         flush=True,
     )
-    def on_chunk(chunk_df, done: int, total: int, is_final: bool):
-        append_results_csv(str(out_path), df_run, chunk_df)
+    def on_chunk(snapshot_df, done: int, total: int, is_final: bool):
+        write_results_csv(str(out_path), df_run, snapshot_df)
         phase = "final" if is_final else "checkpoint"
         print(f"[SAVE] {phase} {done}/{total} -> {out_path}", flush=True)
 

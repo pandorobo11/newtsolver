@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import pandas as pd
+
+from newtsolver.app.cli_app import main
+
+
+class TestCliCheckpointOutput(unittest.TestCase):
+    def test_cli_checkpoint_snapshots_do_not_duplicate_rows(self):
+        df_in = pd.DataFrame(
+            [
+                {"case_id": "case_a", "stl_path": "samples/stl/cube.stl"},
+                {"case_id": "case_b", "stl_path": "samples/stl/cube.stl"},
+                {"case_id": "case_c", "stl_path": "samples/stl/cube.stl"},
+            ]
+        )
+        snapshot_1 = pd.DataFrame(
+            [
+                {"case_id": "case_b", "scope": "total", "component_id": "", "CA": 2.0},
+                {"case_id": "case_c", "scope": "total", "component_id": "", "CA": 3.0},
+            ]
+        )
+        snapshot_2 = pd.DataFrame(
+            [
+                {"case_id": "case_a", "scope": "total", "component_id": "", "CA": 1.0},
+                {"case_id": "case_b", "scope": "total", "component_id": "", "CA": 2.0},
+                {"case_id": "case_c", "scope": "total", "component_id": "", "CA": 3.0},
+            ]
+        )
+
+        def fake_run_cases(
+            _df_run,
+            _logfn,
+            *,
+            workers,
+            flush_every_cases,
+            chunk_cb,
+        ):
+            self.assertEqual(workers, 2)
+            self.assertEqual(flush_every_cases, 2)
+            chunk_cb(snapshot_1, 2, 3, False)
+            chunk_cb(snapshot_2, 3, 3, True)
+            raise RuntimeError("stop after checkpoints")
+
+        with tempfile.TemporaryDirectory(prefix="newtsolver_cli_") as td:
+            input_path = Path(td) / "input.csv"
+            output_path = Path(td) / "out.csv"
+            input_path.write_text("placeholder\n", encoding="utf-8")
+
+            with (
+                patch("newtsolver.app.cli_app.read_cases", return_value=df_in),
+                patch("newtsolver.app.cli_app.run_cases", side_effect=fake_run_cases),
+                patch("builtins.print"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "stop after checkpoints"):
+                    main(
+                        [
+                            "--input",
+                            str(input_path),
+                            "--output",
+                            str(output_path),
+                            "--workers",
+                            "2",
+                            "--flush-every-cases",
+                            "2",
+                        ]
+                    )
+
+            out_df = pd.read_csv(output_path)
+
+        self.assertEqual(out_df["case_id"].astype(str).tolist(), ["case_a", "case_b", "case_c"])
+        self.assertEqual(out_df["case_id"].astype(str).nunique(), 3)
+        self.assertEqual(len(out_df), 3)
+
+
+if __name__ == "__main__":
+    unittest.main()
