@@ -306,6 +306,20 @@ class ViewerPanel(QtWidgets.QWidget):
         """Store loaded case table for overlay lookup by case_id."""
         self.df_cases = df
 
+    @QtCore.Slot()
+    def clear_view(self):
+        """Clear the currently displayed VTP and reset viewer state."""
+        self._poly = None
+        self._loaded_vtp_path = None
+        self._display_case_row = None
+        self._overlay_actor = None
+        self._camera_initialized = False
+        try:
+            self.plotter.clear()
+            self.plotter.render()
+        except Exception:
+            pass
+
     def clear_range(self):
         """Reset scalar colorbar limits to automatic range."""
         self.edit_vmin.setText("")

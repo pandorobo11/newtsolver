@@ -109,6 +109,18 @@ class TestCasesPanelState(unittest.TestCase):
             Path("/tmp/fmfsolver_inputs/outputs/input_result.csv"),
         )
 
+    def test_selecting_case_without_vtp_requests_viewer_clear(self):
+        panel = CasesPanel()
+        panel.df_cases = self._base_loaded_df()
+        panel._populate_case_table()
+
+        cleared: list[bool] = []
+        panel.viewer_clear_requested.connect(lambda: cleared.append(True))
+
+        panel.case_table.selectRow(0)
+
+        self.assertTrue(cleared)
+
 
 if __name__ == "__main__":
     unittest.main()

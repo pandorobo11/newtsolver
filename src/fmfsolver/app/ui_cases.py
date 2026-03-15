@@ -142,6 +142,7 @@ class CasesPanel(QtWidgets.QWidget):
     """Left-side GUI panel that manages case selection and execution."""
 
     vtp_loaded = QtCore.Signal(str, object)
+    viewer_clear_requested = QtCore.Signal()
     cases_updated = QtCore.Signal(object)
 
     def __init__(self, parent=None):
@@ -390,23 +391,28 @@ class CasesPanel(QtWidgets.QWidget):
             return
         sel = self.case_table.selectionModel().selectedRows()
         if not sel:
+            self.viewer_clear_requested.emit()
             return
         row_idx = sel[0].row()
         item = self.case_table.item(row_idx, 0)
         if item is None:
+            self.viewer_clear_requested.emit()
             return
         idx = item.data(QtCore.Qt.ItemDataRole.UserRole)
         row = self.df_cases.iloc[int(idx)].to_dict()
         case_id = str(row.get("case_id", "")).strip()
         out_dir = Path(str(row.get("out_dir", "outputs"))).expanduser()
         if not case_id:
+            self.viewer_clear_requested.emit()
             return
         vtp_path = out_dir / f"{case_id}.vtp"
         if not vtp_path.exists():
+            self.viewer_clear_requested.emit()
             return
         try:
             poly = pv.read(str(vtp_path))
         except Exception as e:
+            self.viewer_clear_requested.emit()
             self.logln(f"[ERROR] Failed to read VTP: {e}")
             return
 
@@ -420,6 +426,8 @@ class CasesPanel(QtWidgets.QWidget):
 
         if actual == expected:
             self.vtp_loaded.emit(str(vtp_path), poly)
+        else:
+            self.viewer_clear_requested.emit()
 
     def run_selected(self):
         """Run selected rows (or all rows) and write result CSV to chosen path."""

@@ -28,6 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.viewer_panel.log_message.connect(self.cases_panel.logln)
         self.cases_panel.vtp_loaded.connect(self.viewer_panel.load_vtp)
+        self.cases_panel.viewer_clear_requested.connect(self.viewer_panel.clear_view)
         self.cases_panel.cases_updated.connect(self.viewer_panel.set_cases_df)
         self.viewer_panel.save_selected_images_requested.connect(
             self._on_save_selected_images
