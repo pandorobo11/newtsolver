@@ -105,8 +105,8 @@ class TestCasesPanelState(unittest.TestCase):
             panel.run_selected()
 
         self.assertEqual(
-            captured["default_path"],
-            "/tmp/fmfsolver_inputs/outputs/input_result.csv",
+            Path(captured["default_path"]),
+            Path("/tmp/fmfsolver_inputs/outputs/input_result.csv"),
         )
 
 

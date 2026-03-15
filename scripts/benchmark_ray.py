@@ -40,6 +40,18 @@ def _ru_maxrss_mib(resource_key: int) -> float:
     return raw / 1024.0
 
 
+def _peak_rss_pair_mib() -> tuple[float, float]:
+    """Return self/children peak RSS in MiB when supported."""
+    try:
+        import resource
+    except ImportError:
+        return (float("nan"), float("nan"))
+    return (
+        _ru_maxrss_mib(resource.RUSAGE_SELF),
+        _ru_maxrss_mib(resource.RUSAGE_CHILDREN),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser for benchmark runs."""
     parser = argparse.ArgumentParser(
@@ -132,7 +144,6 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     for i in range(1, args.repeat + 1):
-        import resource
         import tracemalloc
 
         t0 = time.perf_counter()
@@ -150,8 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         total_scope = result_df[result_df["scope"] == "total"]
         solver_elapsed_sum_s = float(total_scope["run_elapsed_s"].sum())
 
-        rss_self_mib = _ru_maxrss_mib(resource.RUSAGE_SELF)
-        rss_children_mib = _ru_maxrss_mib(resource.RUSAGE_CHILDREN)
+        rss_self_mib, rss_children_mib = _peak_rss_pair_mib()
 
         row = {
             "run_index": i,

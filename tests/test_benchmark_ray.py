@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,22 @@ _SPEC.loader.exec_module(benchmark_ray)
 
 
 class TestBenchmarkRayDefaults(unittest.TestCase):
+    def test_peak_rss_pair_returns_nan_when_resource_is_unavailable(self):
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "resource":
+                raise ImportError("resource unavailable")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            rss_self_mib, rss_children_mib = benchmark_ray._peak_rss_pair_mib()
+
+        self.assertTrue(math.isnan(rss_self_mib))
+        self.assertTrue(math.isnan(rss_children_mib))
+
     def test_default_metrics_output_uses_input_file_directory(self):
         df_in = pd.DataFrame([{"case_id": "case_a", "stl_path": "samples/stl/cube.stl"}])
 

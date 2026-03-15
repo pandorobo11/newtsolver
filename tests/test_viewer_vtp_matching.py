@@ -117,7 +117,10 @@ class TestViewerVtpMatching(unittest.TestCase):
         ):
             ViewerPanel.save_images_for_case_rows(fake_viewer, [row])
 
-        self.assertEqual(captured["default_dir"], "/tmp/fmfsolver_case_outputs/images")
+        self.assertEqual(
+            Path(captured["default_dir"]),
+            Path("/tmp/fmfsolver_case_outputs/images"),
+        )
 
 
 if __name__ == "__main__":
