@@ -40,6 +40,18 @@ def _ru_maxrss_mib(resource_key: int) -> float:
     return raw / 1024.0
 
 
+def _peak_rss_pair_mib() -> tuple[float, float]:
+    """Return self/children peak RSS in MiB when supported."""
+    try:
+        import resource
+    except ImportError:
+        return (float("nan"), float("nan"))
+    return (
+        _ru_maxrss_mib(resource.RUSAGE_SELF),
+        _ru_maxrss_mib(resource.RUSAGE_CHILDREN),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create CLI parser for benchmark runs."""
     parser = argparse.ArgumentParser(
@@ -66,8 +78,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output",
-        default="outputs/benchmark_metrics.csv",
-        help="Path to benchmark metrics CSV.",
+        default=None,
+        help="Path to benchmark metrics CSV (default: <input_dir>/outputs/benchmark_metrics.csv).",
     )
     parser.add_argument(
         "--write-results",
@@ -76,8 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--result-prefix",
-        default="outputs/benchmark_result",
-        help="Output prefix when --write-results is enabled.",
+        default=None,
+        help=(
+            "Output prefix when --write-results is enabled "
+            "(default: <input_dir>/outputs/benchmark_result)."
+        ),
     )
     parser.add_argument(
         "--cases",
@@ -99,7 +114,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--repeat must be >= 1")
 
     input_path = Path(args.input).expanduser()
-    metrics_path = Path(args.output).expanduser()
+    if args.output:
+        metrics_path = Path(args.output).expanduser()
+    else:
+        metrics_path = input_path.parent / "outputs" / "benchmark_metrics.csv"
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
 
     df = read_cases(str(input_path))
@@ -119,9 +137,13 @@ def main(argv: list[str] | None = None) -> int:
         df_run = df.reset_index(drop=True)
 
     rows: list[dict] = []
+    result_prefix = (
+        Path(args.result_prefix).expanduser()
+        if args.result_prefix
+        else input_path.parent / "outputs" / "benchmark_result"
+    )
 
     for i in range(1, args.repeat + 1):
-        import resource
         import tracemalloc
 
         t0 = time.perf_counter()
@@ -132,15 +154,14 @@ def main(argv: list[str] | None = None) -> int:
         wall_s = time.perf_counter() - t0
 
         if args.write_results:
-            result_path = Path(f"{args.result_prefix}_{i:02d}.csv").expanduser()
+            result_path = Path(f"{result_prefix}_{i:02d}.csv").expanduser()
             result_path.parent.mkdir(parents=True, exist_ok=True)
             write_results_csv(str(result_path), df_run, result_df)
 
         total_scope = result_df[result_df["scope"] == "total"]
         solver_elapsed_sum_s = float(total_scope["run_elapsed_s"].sum())
 
-        rss_self_mib = _ru_maxrss_mib(resource.RUSAGE_SELF)
-        rss_children_mib = _ru_maxrss_mib(resource.RUSAGE_CHILDREN)
+        rss_self_mib, rss_children_mib = _peak_rss_pair_mib()
 
         row = {
             "run_index": i,
